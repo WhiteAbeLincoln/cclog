@@ -420,7 +420,17 @@ func (m Model) View() string {
 	// Show help text based on layout
 	if !m.useCompactLayout {
 		s.WriteString("\n")
-		if m.preview.IsVisible() {
+		if m.isSearchMode {
+			// Search mode specific help
+			s.WriteString(renderHelp([]helpItem{
+				{keys: "↑↓", desc: "navigate"},
+				{keys: "enter", desc: "exit search"},
+				{keys: "esc", desc: "cancel search"},
+				{keys: "backspace", desc: "delete char"},
+				{keys: "type", desc: "search text"},
+				{keys: "q", desc: "quit"},
+			}))
+		} else if m.preview.IsVisible() {
 			s.WriteString(renderHelp([]helpItem{
 				{keys: "↑↓/jk", desc: "move"},
 				{keys: "enter", desc: "open"},
@@ -449,7 +459,16 @@ func (m Model) View() string {
 		}
 	} else if m.terminalWidth < 40 {
 		// Very narrow: minimal help
-		if m.preview.IsVisible() {
+		if m.isSearchMode {
+			// Search mode specific help for narrow terminals
+			s.WriteString("\n")
+			s.WriteString(renderHelp([]helpItem{
+				{keys: "↑↓", desc: "nav"},
+				{keys: "enter", desc: "exit"},
+				{keys: "esc", desc: "cancel"},
+				{keys: "q", desc: "quit"},
+			}))
+		} else if m.preview.IsVisible() {
 			s.WriteString("\n")
 			s.WriteString(renderHelp([]helpItem{
 				{keys: "jk", desc: "move"},
@@ -475,7 +494,17 @@ func (m Model) View() string {
 		}
 	} else {
 		// Compact: abbreviated help
-		if m.preview.IsVisible() {
+		if m.isSearchMode {
+			// Search mode specific help for compact layout
+			s.WriteString("\n")
+			s.WriteString(renderHelp([]helpItem{
+				{keys: "↑↓", desc: "navigate"},
+				{keys: "enter", desc: "exit search"},
+				{keys: "esc", desc: "cancel"},
+				{keys: "backspace", desc: "delete"},
+				{keys: "q", desc: "quit"},
+			}))
+		} else if m.preview.IsVisible() {
 			s.WriteString("\n")
 			s.WriteString(renderHelp([]helpItem{
 				{keys: "↑↓/jk", desc: "move"},
