@@ -466,6 +466,35 @@ func TestSearchModeBackspace(t *testing.T) {
 	}
 }
 
+func TestSearchModeBackspaceMultibyte(t *testing.T) {
+	// Red: 全角文字のバックスペース処理のテスト
+	m := NewModel(".", false)
+	m.isSearchMode = true
+	m.searchQuery = "こんにちは"
+
+	// Backspaceで全角文字が正常に削除される
+	msg := tea.KeyMsg{
+		Type: tea.KeyBackspace,
+	}
+
+	model, _ := m.Update(msg)
+	m = model.(Model)
+
+	expected := "こんにち"
+	if m.searchQuery != expected {
+		t.Errorf("全角文字Backspace後の検索クエリが '%s' であるはずが '%s'", expected, m.searchQuery)
+	}
+
+	// もう一度削除
+	model, _ = m.Update(msg)
+	m = model.(Model)
+
+	expected = "こんに"
+	if m.searchQuery != expected {
+		t.Errorf("全角文字2回目Backspace後の検索クエリが '%s' であるはずが '%s'", expected, m.searchQuery)
+	}
+}
+
 func TestSearchModeEscape(t *testing.T) {
 	// Red: このテストはEscapeキーによる検索モード終了が実装されていないため失敗する
 	m := NewModel(".", false)

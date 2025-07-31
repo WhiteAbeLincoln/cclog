@@ -142,9 +142,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.applySearchFilter()
 				return m, tea.Batch(cmds...)
 			case tea.KeyBackspace:
-				// Backspaceで文字を削除
+				// Backspaceで文字を削除（UTF-8ルーン単位）
 				if len(m.searchQuery) > 0 {
-					m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+					runes := []rune(m.searchQuery)
+					if len(runes) > 0 {
+						m.searchQuery = string(runes[:len(runes)-1])
+					}
 					// rebound timeを適用
 					cmds = append(cmds, m.startSearchTimer())
 				}
