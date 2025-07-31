@@ -307,3 +307,55 @@ func extractProjectName(cwd string) string {
 
 	return projectName
 }
+
+// SearchInConversation はメッセージ内容から検索クエリをマッチングする
+func SearchInConversation(query string, messages []types.Message) bool {
+	if query == "" {
+		return true
+	}
+	
+	lowerQuery := strings.ToLower(query)
+	
+	for _, msg := range messages {
+		content := formatter.ExtractMessageContent(&msg)
+		if strings.Contains(strings.ToLower(content), lowerQuery) {
+			return true
+		}
+	}
+	
+	return false
+}
+
+// FilterFilesBySearch は検索クエリに基づいてファイルをフィルタリングする
+func FilterFilesBySearch(query string, files []FileInfo) []FileInfo {
+	if query == "" {
+		return files
+	}
+	
+	var result []FileInfo
+	
+	for _, file := range files {
+		// ディレクトリは常に含める
+		if file.IsDir {
+			result = append(result, file)
+			continue
+		}
+		
+		// JSONLファイル以外はスキップ
+		if !strings.HasSuffix(file.Name, ".jsonl") {
+			continue
+		}
+		
+		// JSONLファイルを解析して検索
+		conversationLog, err := parser.ParseJSONLFile(file.Path)
+		if err != nil {
+			continue
+		}
+		
+		if SearchInConversation(query, conversationLog.Messages) {
+			result = append(result, file)
+		}
+	}
+	
+	return result
+}

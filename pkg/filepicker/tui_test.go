@@ -2,8 +2,12 @@ package filepicker
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestUpdatePreviewSize(t *testing.T) {
@@ -384,5 +388,143 @@ func TestCopySessionIDKeyHandler(t *testing.T) {
 				t.Errorf("Expected sessionId %q, got %q. %s", tt.expectedResult, sessionId, tt.description)
 			}
 		})
+	}
+}
+
+func TestSearchModeToggle(t *testing.T) {
+	// Red: このテストは検索モード切り替えが実装されていないため失敗する
+	m := NewModel(".", false)
+	
+	// 初期状態では検索モードではない
+	if m.isSearchMode {
+		t.Error("初期状態では検索モードでないはず")
+	}
+	
+	// '/'キーで検索モードに切り替わる
+	msg := tea.KeyMsg{
+		Type:  tea.KeyRunes,
+		Runes: []rune{'/'},
+	}
+	
+	model, cmd := m.Update(msg)
+	m = model.(Model)
+	_ = cmd // cmdを使用することを示す
+	
+	if !m.isSearchMode {
+		t.Error("'/'キーで検索モードに切り替わるはず")
+	}
+	
+	// 検索クエリが初期化される
+	if m.searchQuery != "" {
+		t.Error("検索モード開始時、検索クエリは空であるはず")
+	}
+}
+
+func TestSearchModeInput(t *testing.T) {
+	// Red: このテストは検索入力機能が実装されていないため失敗する
+	m := NewModel(".", false)
+	m.isSearchMode = true
+	
+	// 文字入力で検索クエリが更新される
+	msg := tea.KeyMsg{
+		Type:  tea.KeyRunes,
+		Runes: []rune{'h', 'e', 'l', 'l', 'o'},
+	}
+	
+	for _, r := range msg.Runes {
+		keyMsg := tea.KeyMsg{
+			Type:  tea.KeyRunes,
+			Runes: []rune{r},
+		}
+		model, _ := m.Update(keyMsg)
+		m = model.(Model)
+	}
+	
+	expected := "hello"
+	if m.searchQuery != expected {
+		t.Errorf("検索クエリが '%s' であるはずが '%s'", expected, m.searchQuery)
+	}
+}
+
+func TestSearchModeBackspace(t *testing.T) {
+	// Red: このテストは検索モードでのBackspace処理が実装されていないため失敗する
+	m := NewModel(".", false)
+	m.isSearchMode = true
+	m.searchQuery = "hello"
+	
+	// Backspaceで文字が削除される
+	msg := tea.KeyMsg{
+		Type: tea.KeyBackspace,
+	}
+	
+	model, _ := m.Update(msg)
+	m = model.(Model)
+	
+	expected := "hell"
+	if m.searchQuery != expected {
+		t.Errorf("Backspace後の検索クエリが '%s' であるはずが '%s'", expected, m.searchQuery)
+	}
+}
+
+func TestSearchModeEscape(t *testing.T) {
+	// Red: このテストはEscapeキーによる検索モード終了が実装されていないため失敗する
+	m := NewModel(".", false)
+	m.isSearchMode = true
+	m.searchQuery = "test query"
+	
+	// Escapeキーで検索モードを終了
+	msg := tea.KeyMsg{
+		Type: tea.KeyEsc,
+	}
+	
+	model, _ := m.Update(msg)
+	m = model.(Model)
+	
+	if m.isSearchMode {
+		t.Error("Escapeキーで検索モードが終了するはず")
+	}
+	
+	if m.searchQuery != "" {
+		t.Error("検索モード終了時、検索クエリがクリアされるはず")
+	}
+}
+
+func TestSearchFiltering(t *testing.T) {
+	// Red: このテストは検索によるファイルフィルタリングが実装されていないため失敗する
+	tempDir := t.TempDir()
+	
+	// テスト用ファイルを作成
+	file1 := filepath.Join(tempDir, "conversation1.jsonl")
+	content1 := `{"type":"user","message":{"role":"user","content":"hello world"},"uuid":"123","timestamp":"2025-07-31T00:00:00Z"}`
+	os.WriteFile(file1, []byte(content1), 0644)
+	
+	file2 := filepath.Join(tempDir, "conversation2.jsonl")
+	content2 := `{"type":"user","message":{"role":"user","content":"different content"},"uuid":"456","timestamp":"2025-07-31T00:00:00Z"}`
+	os.WriteFile(file2, []byte(content2), 0644)
+	
+	m := NewModel(tempDir, false)
+	m.files = []FileInfo{
+		{Name: "conversation1.jsonl", Path: file1, IsDir: false},
+		{Name: "conversation2.jsonl", Path: file2, IsDir: false},
+	}
+	m.isSearchMode = true
+	m.searchQuery = "hello"
+	
+	// ファイルリストを検索でフィルタリング
+	m.applySearchFilter()
+	
+	// "hello"を含むファイルのみが表示される
+	foundMatchingFile := false
+	for _, file := range m.filteredFiles {
+		if file.Name == "conversation1.jsonl" {
+			foundMatchingFile = true
+		}
+		if file.Name == "conversation2.jsonl" {
+			t.Error("マッチしないファイル 'conversation2.jsonl' がフィルタされていない")
+		}
+	}
+	
+	if !foundMatchingFile {
+		t.Error("マッチするファイル 'conversation1.jsonl' が見つからない")
 	}
 }

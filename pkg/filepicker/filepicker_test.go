@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/annenpolka/cclog/pkg/types"
 )
 
 func TestFileInfo_FilterValue(t *testing.T) {
@@ -966,5 +968,125 @@ func TestGetFilesRecursive_SkipsFilteredEmptyFiles(t *testing.T) {
 
 	if len(files) > 0 && files[0].Name != "normal.jsonl" {
 		t.Errorf("Expected normal.jsonl, got %s", files[0].Name)
+	}
+}
+
+func TestSearchInConversation(t *testing.T) {
+	tests := []struct {
+		name     string
+		query    string
+		messages []types.Message
+		expected bool
+	}{
+		{
+			name:  "マッチする場合",
+			query: "hello world",
+			messages: []types.Message{
+				{Message: map[string]interface{}{"content": "hello world this is a test"}},
+				{Message: map[string]interface{}{"content": "another message"}},
+			},
+			expected: true,
+		},
+		{
+			name:  "マッチしない場合",
+			query: "nonexistent",
+			messages: []types.Message{
+				{Message: map[string]interface{}{"content": "hello world this is a test"}},
+				{Message: map[string]interface{}{"content": "another message"}},
+			},
+			expected: false,
+		},
+		{
+			name:     "空のメッセージ",
+			query:    "hello",
+			messages: []types.Message{},
+			expected: false,
+		},
+		{
+			name:  "大文字小文字を区別しない検索",
+			query: "HELLO",
+			messages: []types.Message{
+				{Message: map[string]interface{}{"content": "hello world"}},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := SearchInConversation(tt.query, tt.messages)
+			if result != tt.expected {
+				t.Errorf("SearchInConversation() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestFilterFilesBySearch(t *testing.T) {
+	tempDir := t.TempDir()
+	
+	// テスト用のJSONLファイルを作成
+	file1 := filepath.Join(tempDir, "conversation1.jsonl")
+	content1 := `{"type":"conversation_start","message":{"content":"hello world","uuid":"123"}}
+{"type":"message","message":{"content":"this is a test","uuid":"456"}}`
+	err := os.WriteFile(file1, []byte(content1), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	file2 := filepath.Join(tempDir, "conversation2.jsonl")
+	content2 := `{"type":"conversation_start","message":{"content":"different content","uuid":"789"}}
+{"type":"message","message":{"content":"no match here","uuid":"abc"}}`
+	err = os.WriteFile(file2, []byte(content2), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	files := []FileInfo{
+		{Name: "conversation1.jsonl", Path: file1, IsDir: false},
+		{Name: "conversation2.jsonl", Path: file2, IsDir: false},
+		{Name: "subdir", Path: filepath.Join(tempDir, "subdir"), IsDir: true},
+	}
+
+	tests := []struct {
+		name     string
+		query    string
+		files    []FileInfo
+		expected int
+	}{
+		{
+			name:     "マッチするファイルが1つ",
+			query:    "hello",
+			files:    files,
+			expected: 1,
+		},
+		{
+			name:     "マッチするファイルがない",
+			query:    "nonexistent",
+			files:    files,
+			expected: 0,
+		},
+		{
+			name:     "空のクエリ",
+			query:    "",
+			files:    files,
+			expected: 2, // すべてのJSONLファイル
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := FilterFilesBySearch(tt.query, tt.files)
+			jsonlCount := 0
+			for _, f := range result {
+				if !f.IsDir && strings.HasSuffix(f.Name, ".jsonl") {
+					jsonlCount++
+				}
+			}
+			
+			if jsonlCount != tt.expected {
+				t.Errorf("FilterFilesBySearch() returned %d JSONL files, want %d", jsonlCount, tt.expected)
+			}
+		})
 	}
 }

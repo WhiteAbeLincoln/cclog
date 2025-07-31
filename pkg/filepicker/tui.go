@@ -60,6 +60,7 @@ var (
 type Model struct {
 	dir              string
 	files            []FileInfo
+	filteredFiles    []FileInfo  // 検索フィルタリング後のファイル
 	cursor           int
 	selected         string
 	recursive        bool
@@ -72,12 +73,15 @@ type Model struct {
 	maxTitleChars    int
 	preview          *PreviewModel
 	enableFiltering  bool
+	isSearchMode     bool        // 検索モードかどうか
+	searchQuery      string      // 検索クエリ
 }
 
 func NewModel(dir string, recursive bool) Model {
 	return Model{
 		dir:              dir,
 		files:            []FileInfo{},
+		filteredFiles:    []FileInfo{}, // 初期は空
 		cursor:           0,
 		recursive:        recursive,
 		maxDisplayFiles:  10, // Default limit
@@ -89,6 +93,8 @@ func NewModel(dir string, recursive bool) Model {
 		maxTitleChars:    40,     // Default title character limit
 		preview:          NewPreviewModel(),
 		enableFiltering:  true, // Default to filtering enabled
+		isSearchMode:     false, // 初期は検索モードではない
+		searchQuery:      "",    // 初期検索クエリは空
 	}
 }
 
@@ -118,6 +124,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updatePreviewSize()
 		return m, tea.Batch(cmds...)
 	case tea.KeyMsg:
+		// 検索モードでの特別な処理
+		if m.isSearchMode {
+			switch msg.Type {
+			case tea.KeyEsc:
+				// Escapeで検索モードを終了
+				m.isSearchMode = false
+				m.searchQuery = ""
+				m.applySearchFilter()
+				return m, tea.Batch(cmds...)
+			case tea.KeyBackspace:
+				// Backspaceで文字を削除
+				if len(m.searchQuery) > 0 {
+					m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+					m.applySearchFilter()
+				}
+				return m, tea.Batch(cmds...)
+			case tea.KeyRunes:
+				// 通常の文字入力
+				m.searchQuery += string(msg.Runes)
+				m.applySearchFilter()
+				return m, tea.Batch(cmds...)
+			}
+			// 検索モード中は他のキーは無視
+			return m, tea.Batch(cmds...)
+		}
+		
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -148,6 +180,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !selectedItem.IsDir {
 					return m, copySessionID(selectedItem.Path)
 				}
+			}
+			return m, tea.Batch(cmds...)
+		case "/":
+			// 検索モードに切り替え
+			if !m.isSearchMode {
+				m.isSearchMode = true
+				m.searchQuery = ""
+			}
+			return m, tea.Batch(cmds...)
+		case "esc":
+			// 検索モードを終了
+			if m.isSearchMode {
+				m.isSearchMode = false
+				m.searchQuery = ""
+				m.applySearchFilter()
 			}
 			return m, tea.Batch(cmds...)
 		case "r":
@@ -181,7 +228,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "down", "j":
-			if m.cursor < len(m.files)-1 {
+			currentFiles := m.files
+			if m.isSearchMode {
+				currentFiles = m.filteredFiles
+			}
+			if m.cursor < len(currentFiles)-1 {
 				m.cursor++
 				// Ensure cursor visibility after movement
 				m.ensureCursorVisible()
@@ -193,8 +244,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "enter":
-			if len(m.files) > 0 {
-				selectedItem := m.files[m.cursor]
+			currentFiles := m.files
+			if m.isSearchMode {
+				currentFiles = m.filteredFiles
+			}
+			if len(currentFiles) > 0 {
+				selectedItem := currentFiles[m.cursor]
 				if selectedItem.IsDir {
 					// Navigate into directory
 					m.dir = selectedItem.Path
@@ -209,6 +264,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case filesLoadedMsg:
 		m.files = msg.files
+		// 検索フィルタを適用
+		m.applySearchFilter()
 		// Reset cursor and scroll when loading new files
 		if m.cursor >= len(m.files) {
 			m.cursor = 0
@@ -258,7 +315,14 @@ func (m Model) View() string {
 		}
 	}
 
-	s.WriteString("📁 " + headerStyle.Render(dirPath) + modeStr + "\n\n")
+	s.WriteString("📁 " + headerStyle.Render(dirPath) + modeStr + "\n")
+	
+	// 検索モードの場合は検索バーを表示
+	if m.isSearchMode {
+		searchPrompt := "🔍 Search: " + m.searchQuery + "▐"
+		s.WriteString(modeStyle.Render(searchPrompt) + "\n")
+	}
+	s.WriteString("\n")
 
 	// Calculate available space for file list using dynamic layout
 	listHeight := m.getListHeight()
@@ -273,7 +337,11 @@ func (m Model) View() string {
 	m.ensureCursorVisible()
 
 	// Calculate display range with scrolling
-	totalFiles := len(m.files)
+	currentFiles := m.files
+	if m.isSearchMode {
+		currentFiles = m.filteredFiles
+	}
+	totalFiles := len(currentFiles)
 	displayStart := m.scrollOffset
 	displayEnd := m.scrollOffset + m.maxDisplayFiles
 
@@ -288,7 +356,7 @@ func (m Model) View() string {
 
 	// Show files list with scrolling and colorful styling
 	for i := displayStart; i < displayEnd; i++ {
-		file := m.files[i]
+		file := currentFiles[i]
 		cursor := " "
 		if i == m.cursor {
 			cursor = cursorStyle.Render(">")
@@ -334,6 +402,7 @@ func (m Model) View() string {
 			s.WriteString(renderHelp([]helpItem{
 				{keys: "↑↓/jk", desc: "move"},
 				{keys: "enter", desc: "open"},
+				{keys: "/", desc: "search"},
 				{keys: "p", desc: "preview"},
 				{keys: "s", desc: "filter"},
 				{keys: "c", desc: "copy sessionId"},
@@ -347,6 +416,7 @@ func (m Model) View() string {
 			s.WriteString(renderHelp([]helpItem{
 				{keys: "↑↓/jk", desc: "move"},
 				{keys: "enter", desc: "open"},
+				{keys: "/", desc: "search"},
 				{keys: "p", desc: "preview"},
 				{keys: "s", desc: "filter"},
 				{keys: "c", desc: "copy sessionId"},
@@ -388,6 +458,7 @@ func (m Model) View() string {
 			s.WriteString(renderHelp([]helpItem{
 				{keys: "↑↓/jk", desc: "move"},
 				{keys: "enter", desc: "open"},
+				{keys: "/", desc: "search"},
 				{keys: "p", desc: "preview"},
 				{keys: "s", desc: "filter"},
 				{keys: "c", desc: "copy sessionId"},
@@ -402,6 +473,7 @@ func (m Model) View() string {
 			s.WriteString(renderHelp([]helpItem{
 				{keys: "↑↓/jk", desc: "move"},
 				{keys: "enter", desc: "open"},
+				{keys: "/", desc: "search"},
 				{keys: "p", desc: "preview"},
 				{keys: "s", desc: "filter"},
 				{keys: "c", desc: "copy sessionId"},
@@ -750,7 +822,12 @@ func (m *Model) getListHeight() int {
 
 // ensureCursorVisible ensures the cursor is within the visible range
 func (m *Model) ensureCursorVisible() {
-	if len(m.files) == 0 {
+	currentFiles := m.files
+	if m.isSearchMode {
+		currentFiles = m.filteredFiles
+	}
+	
+	if len(currentFiles) == 0 {
 		return
 	}
 
@@ -758,8 +835,8 @@ func (m *Model) ensureCursorVisible() {
 	if m.cursor < 0 {
 		m.cursor = 0
 	}
-	if m.cursor >= len(m.files) {
-		m.cursor = len(m.files) - 1
+	if m.cursor >= len(currentFiles) {
+		m.cursor = len(currentFiles) - 1
 	}
 
 	// Ensure maxDisplayFiles is positive
@@ -780,7 +857,7 @@ func (m *Model) ensureCursorVisible() {
 	if m.scrollOffset < 0 {
 		m.scrollOffset = 0
 	}
-	maxScrollOffset := len(m.files) - m.maxDisplayFiles
+	maxScrollOffset := len(currentFiles) - m.maxDisplayFiles
 	if maxScrollOffset < 0 {
 		maxScrollOffset = 0
 	}
@@ -854,4 +931,27 @@ func copySessionID(filePath string) tea.Cmd {
 			error:   nil,
 		}
 	}
+}
+
+// applySearchFilter は検索クエリに基づいてファイルをフィルタリングする
+func (m *Model) applySearchFilter() {
+	if m.searchQuery == "" {
+		// 検索クエリが空の場合はすべてのファイルを表示
+		m.filteredFiles = m.files
+	} else {
+		// 検索クエリでフィルタリング
+		m.filteredFiles = FilterFilesBySearch(m.searchQuery, m.files)
+	}
+	
+	// カーソル位置を調整
+	if m.cursor >= len(m.filteredFiles) {
+		if len(m.filteredFiles) > 0 {
+			m.cursor = len(m.filteredFiles) - 1
+		} else {
+			m.cursor = 0
+		}
+	}
+	
+	// スクロールオフセットを調整
+	m.ensureCursorVisible()
 }
