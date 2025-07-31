@@ -59,47 +59,49 @@ var (
 )
 
 type Model struct {
-	dir              string
-	files            []FileInfo
-	filteredFiles    []FileInfo  // 検索フィルタリング後のファイル
-	cursor           int
-	selected         string
-	recursive        bool
-	maxDisplayFiles  int
-	scrollOffset     int
-	terminalWidth    int
-	terminalHeight   int
-	useCompactLayout bool
-	contentAlignment string
-	maxTitleChars    int
-	preview          *PreviewModel
-	enableFiltering  bool
-	isSearchMode     bool        // 検索モードかどうか
-	searchQuery      string      // 検索クエリ
+	dir               string
+	files             []FileInfo
+	filteredFiles     []FileInfo // 検索フィルタリング後のファイル
+	cursor            int
+	selected          string
+	recursive         bool
+	maxDisplayFiles   int
+	scrollOffset      int
+	terminalWidth     int
+	terminalHeight    int
+	useCompactLayout  bool
+	contentAlignment  string
+	maxTitleChars     int
+	preview           *PreviewModel
+	enableFiltering   bool
+	isSearchMode      bool          // 検索モードかどうか
+	searchQuery       string        // 検索クエリ
+	lastAppliedQuery  string        // 最後に適用された検索クエリ（フィルタ維持用）
 	searchReboundTime time.Duration // 検索のrebound time
-	searchTimer      *time.Timer    // 検索用タイマー
+	searchTimer       *time.Timer   // 検索用タイマー
 }
 
 func NewModel(dir string, recursive bool) Model {
 	return Model{
-		dir:              dir,
-		files:            []FileInfo{},
-		filteredFiles:    []FileInfo{}, // 初期は空
-		cursor:           0,
-		recursive:        recursive,
-		maxDisplayFiles:  10, // Default limit
-		scrollOffset:     0,
-		terminalWidth:    80,     // Default terminal width
-		terminalHeight:   24,     // Default terminal height
-		useCompactLayout: false,  // Default to full layout
-		contentAlignment: "left", // Default alignment
-		maxTitleChars:    40,     // Default title character limit
-		preview:          NewPreviewModel(),
-		enableFiltering:  true, // Default to filtering enabled
-		isSearchMode:     false, // 初期は検索モードではない
-		searchQuery:      "",    // 初期検索クエリは空
+		dir:               dir,
+		files:             []FileInfo{},
+		filteredFiles:     []FileInfo{}, // 初期は空
+		cursor:            0,
+		recursive:         recursive,
+		maxDisplayFiles:   10, // Default limit
+		scrollOffset:      0,
+		terminalWidth:     80,     // Default terminal width
+		terminalHeight:    24,     // Default terminal height
+		useCompactLayout:  false,  // Default to full layout
+		contentAlignment:  "left", // Default alignment
+		maxTitleChars:     40,     // Default title character limit
+		preview:           NewPreviewModel(),
+		enableFiltering:   true,                   // Default to filtering enabled
+		isSearchMode:      false,                  // 初期は検索モードではない
+		searchQuery:       "",                     // 初期検索クエリは空
+		lastAppliedQuery:  "",                     // 初期は空
 		searchReboundTime: 300 * time.Millisecond, // デフォルト300ms
-		searchTimer:      nil, // 初期はnull
+		searchTimer:       nil,                    // 初期はnull
 	}
 }
 
@@ -133,9 +135,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.isSearchMode {
 			switch msg.Type {
 			case tea.KeyEsc:
-				// Escapeで検索モードを終了
+				// Escapeで検索モードを終了し、フィルタをクリア
 				m.isSearchMode = false
 				m.searchQuery = ""
+				m.lastAppliedQuery = "" // フィルタをクリア
 				m.applySearchFilter()
 				return m, tea.Batch(cmds...)
 			case tea.KeyBackspace:
@@ -146,17 +149,36 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmds = append(cmds, m.startSearchTimer())
 				}
 				return m, tea.Batch(cmds...)
+			case tea.KeyUp:
+				// 検索モード中でも↑キーでカーソル移動
+				navCmds := m.handleSearchModeNavigation("up")
+				cmds = append(cmds, navCmds...)
+				return m, tea.Batch(cmds...)
+			case tea.KeyDown:
+				// 検索モード中でも↓キーでカーソル移動
+				navCmds := m.handleSearchModeNavigation("down")
+				cmds = append(cmds, navCmds...)
+				return m, tea.Batch(cmds...)
+			case tea.KeyEnter:
+				// 検索モードでエンターを押した場合、検索モードを終了してフィルタリング状態を維持
+				// 現在の検索クエリを最後に適用されたクエリとして保存
+				m.lastAppliedQuery = m.searchQuery
+				m.isSearchMode = false
+				m.searchQuery = ""
+				// filteredFilesはそのまま維持してフィルタリング状態を保持
+				// ファイルは開かず、単純に検索モードを終了するだけ
+				return m, tea.Batch(cmds...)
 			case tea.KeyRunes:
-				// 通常の文字入力
+				// 検索モードでは全ての文字入力を検索クエリに追加
 				m.searchQuery += string(msg.Runes)
 				// rebound timeを適用
 				cmds = append(cmds, m.startSearchTimer())
 				return m, tea.Batch(cmds...)
 			}
-			// 検索モード中は他のキーは無視
+			// 他のキーは無視
 			return m, tea.Batch(cmds...)
 		}
-		
+
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -197,10 +219,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, tea.Batch(cmds...)
 		case "esc":
-			// 検索モードを終了
+			// 検索モードを終了し、フィルタをクリア
 			if m.isSearchMode {
 				m.isSearchMode = false
 				m.searchQuery = ""
+				m.lastAppliedQuery = "" // フィルタをクリア
 				m.applySearchFilter()
 			}
 			return m, tea.Batch(cmds...)
@@ -236,7 +259,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "down", "j":
 			currentFiles := m.files
-			if m.isSearchMode {
+			if m.isSearchMode || m.lastAppliedQuery != "" {
 				currentFiles = m.filteredFiles
 			}
 			if m.cursor < len(currentFiles)-1 {
@@ -251,22 +274,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "enter":
+			// 通常モードでのエンター処理（検索モードの場合は上で処理済み）
 			currentFiles := m.files
-			if m.isSearchMode {
-				currentFiles = m.filteredFiles
-			}
-			if len(currentFiles) > 0 {
-				selectedItem := currentFiles[m.cursor]
-				if selectedItem.IsDir {
-					// Navigate into directory
-					m.dir = selectedItem.Path
-					m.cursor = 0
-					m.scrollOffset = 0
-					return m, loadFiles(m.dir, m.recursive)
-				} else {
-					// Convert to markdown and open in editor with current filtering state
-					return m, convertAndOpenInEditor(selectedItem.Path, m.enableFiltering)
-				}
+			if cmd := m.handleEnterAction(currentFiles); cmd != nil {
+				return m, cmd
 			}
 		}
 	case filesLoadedMsg:
@@ -327,7 +338,7 @@ func (m Model) View() string {
 	}
 
 	s.WriteString("📁 " + headerStyle.Render(dirPath) + modeStr + "\n")
-	
+
 	// 検索モードの場合は検索バーを表示
 	if m.isSearchMode {
 		searchPrompt := "🔍 Search: " + m.searchQuery + "▐"
@@ -349,7 +360,7 @@ func (m Model) View() string {
 
 	// Calculate display range with scrolling
 	currentFiles := m.files
-	if m.isSearchMode {
+	if m.isSearchMode || m.lastAppliedQuery != "" {
 		currentFiles = m.filteredFiles
 	}
 	totalFiles := len(currentFiles)
@@ -837,10 +848,10 @@ func (m *Model) getListHeight() int {
 // ensureCursorVisible ensures the cursor is within the visible range
 func (m *Model) ensureCursorVisible() {
 	currentFiles := m.files
-	if m.isSearchMode {
+	if m.isSearchMode || m.lastAppliedQuery != "" {
 		currentFiles = m.filteredFiles
 	}
-	
+
 	if len(currentFiles) == 0 {
 		return
 	}
@@ -882,11 +893,21 @@ func (m *Model) ensureCursorVisible() {
 
 // updatePreviewContent updates the preview content based on current selection
 func (m *Model) updatePreviewContent() tea.Cmd {
-	if m.preview == nil || !m.preview.IsVisible() || len(m.files) == 0 {
+	if m.preview == nil || !m.preview.IsVisible() {
 		return nil
 	}
 
-	selectedFile := m.files[m.cursor]
+	// Use appropriate file list based on search mode
+	currentFiles := m.files
+	if m.isSearchMode || m.lastAppliedQuery != "" {
+		currentFiles = m.filteredFiles
+	}
+
+	if len(currentFiles) == 0 {
+		return nil
+	}
+
+	selectedFile := currentFiles[m.cursor]
 	if selectedFile.IsDir {
 		// Clear preview for directories
 		return m.preview.SetContent("")
@@ -949,14 +970,21 @@ func copySessionID(filePath string) tea.Cmd {
 
 // applySearchFilter は検索クエリに基づいてファイルをフィルタリングする
 func (m *Model) applySearchFilter() {
-	if m.searchQuery == "" {
+	queryToUse := m.searchQuery
+	
+	// 検索クエリが空だが、最後に適用されたクエリがある場合は、それを使用してフィルタ状態を維持
+	if queryToUse == "" && m.lastAppliedQuery != "" {
+		queryToUse = m.lastAppliedQuery
+	}
+	
+	if queryToUse == "" {
 		// 検索クエリが空の場合はすべてのファイルを表示
 		m.filteredFiles = m.files
 	} else {
 		// 検索クエリでフィルタリング
-		m.filteredFiles = FilterFilesBySearch(m.searchQuery, m.files)
+		m.filteredFiles = FilterFilesBySearch(queryToUse, m.files)
 	}
-	
+
 	// カーソル位置を調整
 	if m.cursor >= len(m.filteredFiles) {
 		if len(m.filteredFiles) > 0 {
@@ -965,7 +993,7 @@ func (m *Model) applySearchFilter() {
 			m.cursor = 0
 		}
 	}
-	
+
 	// スクロールオフセットを調整
 	m.ensureCursorVisible()
 }
@@ -976,10 +1004,10 @@ func (m *Model) startSearchTimer() tea.Cmd {
 	if m.searchTimer != nil {
 		m.searchTimer.Stop()
 	}
-	
+
 	// 新しいタイマーを開始
 	m.searchTimer = time.NewTimer(m.searchReboundTime)
-	
+
 	// Bubble TeaのCommandを返す
 	return func() tea.Msg {
 		<-m.searchTimer.C
@@ -995,4 +1023,57 @@ func (m *Model) isSearchTimerRunning() bool {
 // executeDelayedSearch は遅延検索を実行する
 func (m *Model) executeDelayedSearch() {
 	m.applySearchFilter()
+}
+
+// handleSearchModeNavigation handles cursor navigation in search mode
+func (m *Model) handleSearchModeNavigation(direction string) []tea.Cmd {
+	var cmds []tea.Cmd
+	currentFiles := m.filteredFiles
+	
+	if len(currentFiles) == 0 {
+		return cmds
+	}
+	
+	// Handle navigation based on direction (only up/down, not j/k)
+	switch direction {
+	case "up":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+	case "down":
+		if m.cursor < len(currentFiles)-1 {
+			m.cursor++
+		}
+	}
+	
+	// Ensure cursor visibility after movement
+	m.ensureCursorVisible()
+	
+	// Update preview if visible
+	if m.preview.IsVisible() {
+		if cmd := m.updatePreviewContent(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+	
+	return cmds
+}
+
+// handleEnterAction handles the enter key action for both search mode and normal mode
+func (m *Model) handleEnterAction(currentFiles []FileInfo) tea.Cmd {
+	if len(currentFiles) == 0 {
+		return nil
+	}
+	
+	selectedItem := currentFiles[m.cursor]
+	if selectedItem.IsDir {
+		// Navigate into directory
+		m.dir = selectedItem.Path
+		m.cursor = 0
+		m.scrollOffset = 0
+		return loadFiles(m.dir, m.recursive)
+	} else {
+		// Convert to markdown and open in editor with current filtering state
+		return convertAndOpenInEditor(selectedItem.Path, m.enableFiltering)
+	}
 }

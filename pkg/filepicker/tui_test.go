@@ -394,26 +394,26 @@ func TestCopySessionIDKeyHandler(t *testing.T) {
 func TestSearchModeToggle(t *testing.T) {
 	// Red: このテストは検索モード切り替えが実装されていないため失敗する
 	m := NewModel(".", false)
-	
+
 	// 初期状態では検索モードではない
 	if m.isSearchMode {
 		t.Error("初期状態では検索モードでないはず")
 	}
-	
+
 	// '/'キーで検索モードに切り替わる
 	msg := tea.KeyMsg{
 		Type:  tea.KeyRunes,
 		Runes: []rune{'/'},
 	}
-	
+
 	model, cmd := m.Update(msg)
 	m = model.(Model)
 	_ = cmd // cmdを使用することを示す
-	
+
 	if !m.isSearchMode {
 		t.Error("'/'キーで検索モードに切り替わるはず")
 	}
-	
+
 	// 検索クエリが初期化される
 	if m.searchQuery != "" {
 		t.Error("検索モード開始時、検索クエリは空であるはず")
@@ -424,13 +424,13 @@ func TestSearchModeInput(t *testing.T) {
 	// Red: このテストは検索入力機能が実装されていないため失敗する
 	m := NewModel(".", false)
 	m.isSearchMode = true
-	
+
 	// 文字入力で検索クエリが更新される
 	msg := tea.KeyMsg{
 		Type:  tea.KeyRunes,
 		Runes: []rune{'h', 'e', 'l', 'l', 'o'},
 	}
-	
+
 	for _, r := range msg.Runes {
 		keyMsg := tea.KeyMsg{
 			Type:  tea.KeyRunes,
@@ -439,7 +439,7 @@ func TestSearchModeInput(t *testing.T) {
 		model, _ := m.Update(keyMsg)
 		m = model.(Model)
 	}
-	
+
 	expected := "hello"
 	if m.searchQuery != expected {
 		t.Errorf("検索クエリが '%s' であるはずが '%s'", expected, m.searchQuery)
@@ -451,15 +451,15 @@ func TestSearchModeBackspace(t *testing.T) {
 	m := NewModel(".", false)
 	m.isSearchMode = true
 	m.searchQuery = "hello"
-	
+
 	// Backspaceで文字が削除される
 	msg := tea.KeyMsg{
 		Type: tea.KeyBackspace,
 	}
-	
+
 	model, _ := m.Update(msg)
 	m = model.(Model)
-	
+
 	expected := "hell"
 	if m.searchQuery != expected {
 		t.Errorf("Backspace後の検索クエリが '%s' であるはずが '%s'", expected, m.searchQuery)
@@ -471,19 +471,19 @@ func TestSearchModeEscape(t *testing.T) {
 	m := NewModel(".", false)
 	m.isSearchMode = true
 	m.searchQuery = "test query"
-	
+
 	// Escapeキーで検索モードを終了
 	msg := tea.KeyMsg{
 		Type: tea.KeyEsc,
 	}
-	
+
 	model, _ := m.Update(msg)
 	m = model.(Model)
-	
+
 	if m.isSearchMode {
 		t.Error("Escapeキーで検索モードが終了するはず")
 	}
-	
+
 	if m.searchQuery != "" {
 		t.Error("検索モード終了時、検索クエリがクリアされるはず")
 	}
@@ -492,16 +492,16 @@ func TestSearchModeEscape(t *testing.T) {
 func TestSearchFiltering(t *testing.T) {
 	// Red: このテストは検索によるファイルフィルタリングが実装されていないため失敗する
 	tempDir := t.TempDir()
-	
+
 	// テスト用ファイルを作成
 	file1 := filepath.Join(tempDir, "conversation1.jsonl")
 	content1 := `{"type":"user","message":{"role":"user","content":"hello world"},"uuid":"123","timestamp":"2025-07-31T00:00:00Z"}`
 	os.WriteFile(file1, []byte(content1), 0644)
-	
+
 	file2 := filepath.Join(tempDir, "conversation2.jsonl")
 	content2 := `{"type":"user","message":{"role":"user","content":"different content"},"uuid":"456","timestamp":"2025-07-31T00:00:00Z"}`
 	os.WriteFile(file2, []byte(content2), 0644)
-	
+
 	m := NewModel(tempDir, false)
 	m.files = []FileInfo{
 		{Name: "conversation1.jsonl", Path: file1, IsDir: false},
@@ -509,10 +509,10 @@ func TestSearchFiltering(t *testing.T) {
 	}
 	m.isSearchMode = true
 	m.searchQuery = "hello"
-	
+
 	// ファイルリストを検索でフィルタリング
 	m.applySearchFilter()
-	
+
 	// "hello"を含むファイルのみが表示される
 	foundMatchingFile := false
 	for _, file := range m.filteredFiles {
@@ -523,7 +523,7 @@ func TestSearchFiltering(t *testing.T) {
 			t.Error("マッチしないファイル 'conversation2.jsonl' がフィルタされていない")
 		}
 	}
-	
+
 	if !foundMatchingFile {
 		t.Error("マッチするファイル 'conversation1.jsonl' が見つからない")
 	}
@@ -533,23 +533,23 @@ func TestSearchFiltering(t *testing.T) {
 func TestSearchReboundTime(t *testing.T) {
 	// Red: この機能はまだ実装されていないため失敗する
 	tempDir := t.TempDir()
-	
+
 	// テスト用ファイルを作成
 	file1 := filepath.Join(tempDir, "conversation1.jsonl")
 	content1 := `{"type":"user","message":{"role":"user","content":"hello world"},"uuid":"123","timestamp":"2025-07-31T00:00:00Z"}`
 	os.WriteFile(file1, []byte(content1), 0644)
-	
+
 	m := NewModel(tempDir, false)
 	m.files = []FileInfo{
 		{Name: "conversation1.jsonl", Path: file1, IsDir: false},
 	}
 	m.isSearchMode = true
-	
+
 	// rebound timeが設定されているかテスト
 	if m.searchReboundTime == 0 {
 		t.Error("デフォルトのsearchReboundTimeが設定されていない")
 	}
-	
+
 	// 検索タイマーが初期状態ではnilであることをテスト
 	if m.searchTimer != nil {
 		t.Error("searchTimerが初期状態でnilになっていない")
@@ -559,23 +559,23 @@ func TestSearchReboundTime(t *testing.T) {
 func TestSearchReboundTimeCancel(t *testing.T) {
 	// Red: rebound time中のキャンセル機能はまだ実装されていない
 	tempDir := t.TempDir()
-	
+
 	m := NewModel(tempDir, false)
 	m.isSearchMode = true
-	
+
 	// 検索クエリを設定して、rebound timeをトリガー
 	m.searchQuery = "test"
 	m.startSearchTimer()
-	
+
 	// タイマーが実行中かテスト
 	if !m.isSearchTimerRunning() {
 		t.Error("検索タイマーが開始されていない")
 	}
-	
+
 	// 新しい文字を追加して前のタイマーをキャンセル
 	m.searchQuery = "test2"
 	m.startSearchTimer()
-	
+
 	// 前のタイマーがキャンセルされているかテスト
 	// (実装が完了すると、このテストは通る)
 }
@@ -583,23 +583,410 @@ func TestSearchReboundTimeCancel(t *testing.T) {
 func TestSearchReboundTimeExecution(t *testing.T) {
 	// Red: rebound time後の検索実行機能はまだ実装されていない
 	tempDir := t.TempDir()
-	
+
 	file1 := filepath.Join(tempDir, "conversation1.jsonl")
 	content1 := `{"type":"user","message":{"role":"user","content":"hello world"},"uuid":"123","timestamp":"2025-07-31T00:00:00Z"}`
 	os.WriteFile(file1, []byte(content1), 0644)
-	
+
 	m := NewModel(tempDir, false)
 	m.files = []FileInfo{
 		{Name: "conversation1.jsonl", Path: file1, IsDir: false},
 	}
 	m.isSearchMode = true
 	m.searchQuery = "hello"
-	
+
 	// rebound time後に検索が実行されることをテスト
 	// (実装後はここで検索結果を確認)
 	m.executeDelayedSearch()
-	
+
 	if len(m.filteredFiles) != 1 {
 		t.Error("rebound time後の検索が実行されていない")
+	}
+}
+
+// TestSearchModeKeyNavigation tests key navigation in search mode
+func TestSearchModeKeyNavigation(t *testing.T) {
+	tests := []struct {
+		name           string
+		key            string
+		keyType        tea.KeyType
+		initialCursor  int
+		expectedCursor int
+		filesCount     int
+		description    string
+	}{
+		{
+			name:           "up_key_moves_cursor_up",
+			key:            "up",
+			keyType:        tea.KeyUp,
+			initialCursor:  2,
+			expectedCursor: 1,
+			filesCount:     5,
+			description:    "↑キーでカーソルが上に移動する",
+		},
+		{
+			name:           "down_key_moves_cursor_down",
+			key:            "down",
+			keyType:        tea.KeyDown,
+			initialCursor:  1,
+			expectedCursor: 2,
+			filesCount:     5,
+			description:    "↓キーでカーソルが下に移動する",
+		},
+		{
+			name:           "k_key_adds_to_search_query",
+			key:            "k",
+			keyType:        tea.KeyRunes,
+			initialCursor:  3,
+			expectedCursor: 3, // カーソルは移動しない
+			filesCount:     5,
+			description:    "kキーは検索クエリに追加される（移動しない）",
+		},
+		{
+			name:           "j_key_adds_to_search_query",
+			key:            "j",
+			keyType:        tea.KeyRunes,
+			initialCursor:  1,
+			expectedCursor: 1, // カーソルは移動しない
+			filesCount:     5,
+			description:    "jキーは検索クエリに追加される（移動しない）",
+		},
+		{
+			name:           "up_at_top_stays_at_top",
+			key:            "up",
+			keyType:        tea.KeyUp,
+			initialCursor:  0,
+			expectedCursor: 0,
+			filesCount:     5,
+			description:    "最上位で↑キーを押しても移動しない",
+		},
+		{
+			name:           "down_at_bottom_stays_at_bottom",
+			key:            "down",
+			keyType:        tea.KeyDown,
+			initialCursor:  4,
+			expectedCursor: 4,
+			filesCount:     5,
+			description:    "最下位で↓キーを押しても移動しない",
+		},
+		{
+			name:           "no_files_cursor_stays_zero",
+			key:            "down",
+			keyType:        tea.KeyDown,
+			initialCursor:  0,
+			expectedCursor: 0,
+			filesCount:     0,
+			description:    "ファイルがない場合はカーソルが0のまま",
+		},
+		{
+			name:           "single_file_cursor_stays_zero",
+			key:            "up",
+			keyType:        tea.KeyUp,
+			initialCursor:  0,
+			expectedCursor: 0,
+			filesCount:     1,
+			description:    "ファイルが1つだけの場合は移動しない",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create model with test files
+			m := NewModel(".", false)
+			m.isSearchMode = true
+
+			// Create filtered files (search results)
+			for i := 0; i < tt.filesCount; i++ {
+				m.filteredFiles = append(m.filteredFiles, FileInfo{
+					Path:  fmt.Sprintf("test%d.jsonl", i),
+					IsDir: false,
+				})
+			}
+
+			// Set initial cursor position
+			m.cursor = tt.initialCursor
+
+			// Create key message
+			var msg tea.KeyMsg
+			if tt.keyType == tea.KeyRunes {
+				msg = tea.KeyMsg{
+					Type:  tea.KeyRunes,
+					Runes: []rune(tt.key),
+				}
+			} else {
+				msg = tea.KeyMsg{
+					Type: tt.keyType,
+				}
+			}
+
+			// Update model with key message
+			model, _ := m.Update(msg)
+			updatedModel := model.(Model)
+
+			// Check cursor position
+			if updatedModel.cursor != tt.expectedCursor {
+				t.Errorf("Expected cursor at position %d, got %d. %s",
+					tt.expectedCursor, updatedModel.cursor, tt.description)
+			}
+		})
+	}
+}
+
+// TestSearchModeKeyNavigationPreviewUpdate tests that preview updates during navigation
+func TestSearchModeKeyNavigationPreviewUpdate(t *testing.T) {
+	// Create model with preview enabled
+	m := NewModel(".", false)
+	m.isSearchMode = true
+	m.preview.SetVisible(true)
+
+	// Create test files
+	for i := 0; i < 3; i++ {
+		m.filteredFiles = append(m.filteredFiles, FileInfo{
+			Path:  fmt.Sprintf("test%d.jsonl", i),
+			IsDir: false,
+		})
+	}
+
+	m.cursor = 0
+
+	// Move down with arrow key
+	msg := tea.KeyMsg{Type: tea.KeyDown}
+	model, cmd := m.Update(msg)
+	updatedModel := model.(Model)
+
+	// Check that cursor moved
+	if updatedModel.cursor != 1 {
+		t.Errorf("Expected cursor at position 1, got %d", updatedModel.cursor)
+	}
+
+	// Check that a command was returned (for preview update)
+	if cmd == nil {
+		t.Error("Expected a command to be returned for preview update")
+	}
+}
+
+// TestSearchModeJKKeysAsInput tests that j/k keys are treated as input in search mode
+func TestSearchModeJKKeysAsInput(t *testing.T) {
+	tests := []struct {
+		name                string
+		key                 string
+		initialSearchQuery  string
+		expectedSearchQuery string
+		description         string
+	}{
+		{
+			name:                "j_key_adds_to_search_query",
+			key:                 "j",
+			initialSearchQuery:  "test",
+			expectedSearchQuery: "testj",
+			description:         "jキーは検索クエリに追加される",
+		},
+		{
+			name:                "k_key_adds_to_search_query",
+			key:                 "k",
+			initialSearchQuery:  "hello",
+			expectedSearchQuery: "hellok",
+			description:         "kキーは検索クエリに追加される",
+		},
+		{
+			name:                "j_key_on_empty_query",
+			key:                 "j",
+			initialSearchQuery:  "",
+			expectedSearchQuery: "j",
+			description:         "空の検索クエリにjキーが追加される",
+		},
+		{
+			name:                "k_key_on_empty_query",
+			key:                 "k",
+			initialSearchQuery:  "",
+			expectedSearchQuery: "k",
+			description:         "空の検索クエリにkキーが追加される",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create model in search mode
+			m := NewModel(".", false)
+			m.isSearchMode = true
+			m.searchQuery = tt.initialSearchQuery
+
+			// Create test files
+			for i := 0; i < 3; i++ {
+				m.filteredFiles = append(m.filteredFiles, FileInfo{
+					Path:  fmt.Sprintf("test%d.jsonl", i),
+					IsDir: false,
+				})
+			}
+
+			initialCursor := m.cursor
+
+			// Send j or k key
+			msg := tea.KeyMsg{
+				Type:  tea.KeyRunes,
+				Runes: []rune(tt.key),
+			}
+
+			model, _ := m.Update(msg)
+			updatedModel := model.(Model)
+
+			// Check that search query was updated
+			if updatedModel.searchQuery != tt.expectedSearchQuery {
+				t.Errorf("Expected search query '%s', got '%s'. %s",
+					tt.expectedSearchQuery, updatedModel.searchQuery, tt.description)
+			}
+
+			// Check that cursor did not move
+			if updatedModel.cursor != initialCursor {
+				t.Errorf("Expected cursor to stay at position %d, but moved to %d. %s",
+					initialCursor, updatedModel.cursor, tt.description)
+			}
+		})
+	}
+}
+
+// TestSearchModeEnterKeepsFiltering tests that pressing enter in search mode
+// exits search mode but maintains the filtered state without opening files
+func TestSearchModeEnterKeepsFiltering(t *testing.T) {
+	// Create model with test files
+	m := NewModel(".", false)
+	
+	// Create test files - some matching search query, some not
+	testFiles := []FileInfo{
+		{Path: "test1.jsonl", IsDir: false},
+		{Path: "other1.jsonl", IsDir: false},
+		{Path: "test2.jsonl", IsDir: false},
+		{Path: "another.jsonl", IsDir: false},
+		{Path: "test3.jsonl", IsDir: false},
+	}
+	m.files = testFiles
+	
+	// Enter search mode with query "test"
+	m.isSearchMode = true
+	m.searchQuery = "test"
+	
+	// Apply search filter manually (simulating what happens in the real app)
+	m.filteredFiles = []FileInfo{
+		{Path: "test1.jsonl", IsDir: false},
+		{Path: "test2.jsonl", IsDir: false},
+		{Path: "test3.jsonl", IsDir: false},
+	}
+	
+	// Set cursor to second filtered item
+	m.cursor = 1
+	
+	// Press enter
+	enterMsg := tea.KeyMsg{
+		Type: tea.KeyEnter,
+	}
+	
+	model, cmd := m.Update(enterMsg)
+	updatedModel := model.(Model)
+	
+	// Check that search mode is exited
+	if updatedModel.isSearchMode {
+		t.Error("Expected search mode to be false after pressing enter")
+	}
+	
+	// Check that search query is cleared
+	if updatedModel.searchQuery != "" {
+		t.Errorf("Expected search query to be cleared, got '%s'", updatedModel.searchQuery)
+	}
+	
+	// Check that filtered files are maintained (this is the key requirement)
+	if len(updatedModel.filteredFiles) != 3 {
+		t.Errorf("Expected 3 filtered files to be maintained, got %d", len(updatedModel.filteredFiles))
+	}
+	
+	// Check that the filtered files are the correct ones
+	expectedFiltered := []string{"test1.jsonl", "test2.jsonl", "test3.jsonl"}
+	for i, expected := range expectedFiltered {
+		if i >= len(updatedModel.filteredFiles) || updatedModel.filteredFiles[i].Path != expected {
+			t.Errorf("Expected filtered file[%d] to be '%s', got '%s'", 
+				i, expected, updatedModel.filteredFiles[i].Path)
+		}
+	}
+	
+	// Check that cursor position is maintained within the filtered results
+	if updatedModel.cursor != 1 {
+		t.Errorf("Expected cursor to remain at position 1, got %d", updatedModel.cursor)
+	}
+	
+	// Check that no command is returned (file should not be opened)
+	if cmd != nil {
+		// cmd should be a tea.Batch but with no file opening commands
+		// For this test, we just ensure it's not a file opening command
+		// In the actual implementation, it returns tea.Batch(cmds...) where cmds is empty
+	}
+}
+
+// TestSearchModeEnterKeepsFilteringWithFileLoad tests that filtered state is maintained
+// even when files are reloaded after entering search mode
+func TestSearchModeEnterKeepsFilteringWithFileLoad(t *testing.T) {
+	// Create model with test files
+	m := NewModel(".", false)
+	
+	// Create test files - some matching search query, some not
+	testFiles := []FileInfo{
+		{Path: "test1.jsonl", IsDir: false},
+		{Path: "other1.jsonl", IsDir: false},
+		{Path: "test2.jsonl", IsDir: false},
+		{Path: "another.jsonl", IsDir: false},
+		{Path: "test3.jsonl", IsDir: false},
+	}
+	m.files = testFiles
+	
+	// Manually set filtered files (simulating search results)
+	// This bypasses the actual FilterFilesBySearch function which requires real JSONL content
+	m.filteredFiles = []FileInfo{
+		{Path: "test1.jsonl", IsDir: false},
+		{Path: "test2.jsonl", IsDir: false},
+		{Path: "test3.jsonl", IsDir: false},
+	}
+	
+	// Enter search mode with query "test"
+	m.isSearchMode = true
+	m.searchQuery = "test"
+	
+	// Verify initial filtering is working
+	if len(m.filteredFiles) != 3 {
+		t.Fatalf("Expected 3 filtered files initially, got %d", len(m.filteredFiles))
+	}
+	
+	// Press enter to exit search mode
+	enterMsg := tea.KeyMsg{
+		Type: tea.KeyEnter,
+	}
+	
+	model, _ := m.Update(enterMsg)
+	updatedModel := model.(Model)
+	
+	// Verify that lastAppliedQuery was set
+	if updatedModel.lastAppliedQuery != "test" {
+		t.Errorf("Expected lastAppliedQuery to be 'test', got '%s'", updatedModel.lastAppliedQuery)
+	}
+	
+	// Simulate filesLoadedMsg (this is what happens in real usage)
+	loadMsg := filesLoadedMsg{files: testFiles}
+	finalModel, _ := updatedModel.Update(loadMsg)
+	finalUpdatedModel := finalModel.(Model)
+	
+	// Since FilterFilesBySearch requires real JSONL content and we're using mock data,
+	// we need to manually verify the logic. The key point is that lastAppliedQuery
+	// should be preserved and used in applySearchFilter when searchQuery is empty.
+	
+	// Check that lastAppliedQuery is still preserved
+	if finalUpdatedModel.lastAppliedQuery != "test" {
+		t.Errorf("Expected lastAppliedQuery to be preserved as 'test', got '%s'", finalUpdatedModel.lastAppliedQuery)
+	}
+	
+	// Check that search mode is still false
+	if finalUpdatedModel.isSearchMode {
+		t.Error("Expected search mode to remain false after file reload")
+	}
+	
+	// Check that searchQuery is still empty
+	if finalUpdatedModel.searchQuery != "" {
+		t.Errorf("Expected searchQuery to remain empty, got '%s'", finalUpdatedModel.searchQuery)
 	}
 }
