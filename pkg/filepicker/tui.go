@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/annenpolka/cclog/internal/formatter"
 	"github.com/annenpolka/cclog/internal/parser"
@@ -75,6 +76,8 @@ type Model struct {
 	enableFiltering  bool
 	isSearchMode     bool        // 検索モードかどうか
 	searchQuery      string      // 検索クエリ
+	searchReboundTime time.Duration // 検索のrebound time
+	searchTimer      *time.Timer    // 検索用タイマー
 }
 
 func NewModel(dir string, recursive bool) Model {
@@ -95,6 +98,8 @@ func NewModel(dir string, recursive bool) Model {
 		enableFiltering:  true, // Default to filtering enabled
 		isSearchMode:     false, // 初期は検索モードではない
 		searchQuery:      "",    // 初期検索クエリは空
+		searchReboundTime: 300 * time.Millisecond, // デフォルト300ms
+		searchTimer:      nil, // 初期はnull
 	}
 }
 
@@ -137,13 +142,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Backspaceで文字を削除
 				if len(m.searchQuery) > 0 {
 					m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
-					m.applySearchFilter()
+					// rebound timeを適用
+					cmds = append(cmds, m.startSearchTimer())
 				}
 				return m, tea.Batch(cmds...)
 			case tea.KeyRunes:
 				// 通常の文字入力
 				m.searchQuery += string(msg.Runes)
-				m.applySearchFilter()
+				// rebound timeを適用
+				cmds = append(cmds, m.startSearchTimer())
 				return m, tea.Batch(cmds...)
 			}
 			// 検索モード中は他のキーは無視
@@ -288,6 +295,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// For now, we silently handle success/failure
 		// In a more advanced implementation, we could show a status message
 		_ = msg
+	case searchTimerMsg:
+		// rebound time経過後の検索実行
+		m.executeDelayedSearch()
+		m.searchTimer = nil // タイマーをクリア
 	}
 	return m, tea.Batch(cmds...)
 }
@@ -513,6 +524,9 @@ func (m Model) GetSelectedFile() string {
 type filesLoadedMsg struct {
 	files []FileInfo
 }
+
+// searchTimerMsg は検索タイマーが終了したときに送信されるメッセージ
+type searchTimerMsg struct{}
 
 func loadFiles(dir string, recursive bool) tea.Cmd {
 	return func() tea.Msg {
@@ -954,4 +968,31 @@ func (m *Model) applySearchFilter() {
 	
 	// スクロールオフセットを調整
 	m.ensureCursorVisible()
+}
+
+// startSearchTimer はrebound timeタイマーを開始する
+func (m *Model) startSearchTimer() tea.Cmd {
+	// 既存のタイマーがあればキャンセル
+	if m.searchTimer != nil {
+		m.searchTimer.Stop()
+	}
+	
+	// 新しいタイマーを開始
+	m.searchTimer = time.NewTimer(m.searchReboundTime)
+	
+	// Bubble TeaのCommandを返す
+	return func() tea.Msg {
+		<-m.searchTimer.C
+		return searchTimerMsg{}
+	}
+}
+
+// isSearchTimerRunning はタイマーが実行中かどうかを返す
+func (m *Model) isSearchTimerRunning() bool {
+	return m.searchTimer != nil
+}
+
+// executeDelayedSearch は遅延検索を実行する
+func (m *Model) executeDelayedSearch() {
+	m.applySearchFilter()
 }

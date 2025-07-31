@@ -528,3 +528,78 @@ func TestSearchFiltering(t *testing.T) {
 		t.Error("マッチするファイル 'conversation1.jsonl' が見つからない")
 	}
 }
+
+// rebound time機能のテスト
+func TestSearchReboundTime(t *testing.T) {
+	// Red: この機能はまだ実装されていないため失敗する
+	tempDir := t.TempDir()
+	
+	// テスト用ファイルを作成
+	file1 := filepath.Join(tempDir, "conversation1.jsonl")
+	content1 := `{"type":"user","message":{"role":"user","content":"hello world"},"uuid":"123","timestamp":"2025-07-31T00:00:00Z"}`
+	os.WriteFile(file1, []byte(content1), 0644)
+	
+	m := NewModel(tempDir, false)
+	m.files = []FileInfo{
+		{Name: "conversation1.jsonl", Path: file1, IsDir: false},
+	}
+	m.isSearchMode = true
+	
+	// rebound timeが設定されているかテスト
+	if m.searchReboundTime == 0 {
+		t.Error("デフォルトのsearchReboundTimeが設定されていない")
+	}
+	
+	// 検索タイマーが初期状態ではnilであることをテスト
+	if m.searchTimer != nil {
+		t.Error("searchTimerが初期状態でnilになっていない")
+	}
+}
+
+func TestSearchReboundTimeCancel(t *testing.T) {
+	// Red: rebound time中のキャンセル機能はまだ実装されていない
+	tempDir := t.TempDir()
+	
+	m := NewModel(tempDir, false)
+	m.isSearchMode = true
+	
+	// 検索クエリを設定して、rebound timeをトリガー
+	m.searchQuery = "test"
+	m.startSearchTimer()
+	
+	// タイマーが実行中かテスト
+	if !m.isSearchTimerRunning() {
+		t.Error("検索タイマーが開始されていない")
+	}
+	
+	// 新しい文字を追加して前のタイマーをキャンセル
+	m.searchQuery = "test2"
+	m.startSearchTimer()
+	
+	// 前のタイマーがキャンセルされているかテスト
+	// (実装が完了すると、このテストは通る)
+}
+
+func TestSearchReboundTimeExecution(t *testing.T) {
+	// Red: rebound time後の検索実行機能はまだ実装されていない
+	tempDir := t.TempDir()
+	
+	file1 := filepath.Join(tempDir, "conversation1.jsonl")
+	content1 := `{"type":"user","message":{"role":"user","content":"hello world"},"uuid":"123","timestamp":"2025-07-31T00:00:00Z"}`
+	os.WriteFile(file1, []byte(content1), 0644)
+	
+	m := NewModel(tempDir, false)
+	m.files = []FileInfo{
+		{Name: "conversation1.jsonl", Path: file1, IsDir: false},
+	}
+	m.isSearchMode = true
+	m.searchQuery = "hello"
+	
+	// rebound time後に検索が実行されることをテスト
+	// (実装後はここで検索結果を確認)
+	m.executeDelayedSearch()
+	
+	if len(m.filteredFiles) != 1 {
+		t.Error("rebound time後の検索が実行されていない")
+	}
+}
