@@ -48,3 +48,6 @@ Thumbs.db
 # Test coverage
 coverage.txt
 coverage.html
+
+# Serena cache files
+.serena/cache/
