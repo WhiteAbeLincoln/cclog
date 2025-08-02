@@ -879,7 +879,7 @@ func TestSearchModeJKKeysAsInput(t *testing.T) {
 func TestSearchModeEnterKeepsFiltering(t *testing.T) {
 	// Create model with test files
 	m := NewModel(".", false)
-	
+
 	// Create test files - some matching search query, some not
 	testFiles := []FileInfo{
 		{Path: "test1.jsonl", IsDir: false},
@@ -889,58 +889,58 @@ func TestSearchModeEnterKeepsFiltering(t *testing.T) {
 		{Path: "test3.jsonl", IsDir: false},
 	}
 	m.files = testFiles
-	
+
 	// Enter search mode with query "test"
 	m.isSearchMode = true
 	m.searchQuery = "test"
-	
+
 	// Apply search filter manually (simulating what happens in the real app)
 	m.filteredFiles = []FileInfo{
 		{Path: "test1.jsonl", IsDir: false},
 		{Path: "test2.jsonl", IsDir: false},
 		{Path: "test3.jsonl", IsDir: false},
 	}
-	
+
 	// Set cursor to second filtered item
 	m.cursor = 1
-	
+
 	// Press enter
 	enterMsg := tea.KeyMsg{
 		Type: tea.KeyEnter,
 	}
-	
+
 	model, cmd := m.Update(enterMsg)
 	updatedModel := model.(Model)
-	
+
 	// Check that search mode is exited
 	if updatedModel.isSearchMode {
 		t.Error("Expected search mode to be false after pressing enter")
 	}
-	
+
 	// Check that search query is cleared
 	if updatedModel.searchQuery != "" {
 		t.Errorf("Expected search query to be cleared, got '%s'", updatedModel.searchQuery)
 	}
-	
+
 	// Check that filtered files are maintained (this is the key requirement)
 	if len(updatedModel.filteredFiles) != 3 {
 		t.Errorf("Expected 3 filtered files to be maintained, got %d", len(updatedModel.filteredFiles))
 	}
-	
+
 	// Check that the filtered files are the correct ones
 	expectedFiltered := []string{"test1.jsonl", "test2.jsonl", "test3.jsonl"}
 	for i, expected := range expectedFiltered {
 		if i >= len(updatedModel.filteredFiles) || updatedModel.filteredFiles[i].Path != expected {
-			t.Errorf("Expected filtered file[%d] to be '%s', got '%s'", 
+			t.Errorf("Expected filtered file[%d] to be '%s', got '%s'",
 				i, expected, updatedModel.filteredFiles[i].Path)
 		}
 	}
-	
+
 	// Check that cursor position is maintained within the filtered results
 	if updatedModel.cursor != 1 {
 		t.Errorf("Expected cursor to remain at position 1, got %d", updatedModel.cursor)
 	}
-	
+
 	// Check that no command is returned (file should not be opened)
 	if cmd != nil {
 		// cmd should be a tea.Batch but with no file opening commands
@@ -954,7 +954,7 @@ func TestSearchModeEnterKeepsFiltering(t *testing.T) {
 func TestSearchModeEnterKeepsFilteringWithFileLoad(t *testing.T) {
 	// Create model with test files
 	m := NewModel(".", false)
-	
+
 	// Create test files - some matching search query, some not
 	testFiles := []FileInfo{
 		{Path: "test1.jsonl", IsDir: false},
@@ -964,7 +964,7 @@ func TestSearchModeEnterKeepsFilteringWithFileLoad(t *testing.T) {
 		{Path: "test3.jsonl", IsDir: false},
 	}
 	m.files = testFiles
-	
+
 	// Manually set filtered files (simulating search results)
 	// This bypasses the actual FilterFilesBySearch function which requires real JSONL content
 	m.filteredFiles = []FileInfo{
@@ -972,48 +972,48 @@ func TestSearchModeEnterKeepsFilteringWithFileLoad(t *testing.T) {
 		{Path: "test2.jsonl", IsDir: false},
 		{Path: "test3.jsonl", IsDir: false},
 	}
-	
+
 	// Enter search mode with query "test"
 	m.isSearchMode = true
 	m.searchQuery = "test"
-	
+
 	// Verify initial filtering is working
 	if len(m.filteredFiles) != 3 {
 		t.Fatalf("Expected 3 filtered files initially, got %d", len(m.filteredFiles))
 	}
-	
+
 	// Press enter to exit search mode
 	enterMsg := tea.KeyMsg{
 		Type: tea.KeyEnter,
 	}
-	
+
 	model, _ := m.Update(enterMsg)
 	updatedModel := model.(Model)
-	
+
 	// Verify that lastAppliedQuery was set
 	if updatedModel.lastAppliedQuery != "test" {
 		t.Errorf("Expected lastAppliedQuery to be 'test', got '%s'", updatedModel.lastAppliedQuery)
 	}
-	
+
 	// Simulate filesLoadedMsg (this is what happens in real usage)
 	loadMsg := filesLoadedMsg{files: testFiles}
 	finalModel, _ := updatedModel.Update(loadMsg)
 	finalUpdatedModel := finalModel.(Model)
-	
+
 	// Since FilterFilesBySearch requires real JSONL content and we're using mock data,
 	// we need to manually verify the logic. The key point is that lastAppliedQuery
 	// should be preserved and used in applySearchFilter when searchQuery is empty.
-	
+
 	// Check that lastAppliedQuery is still preserved
 	if finalUpdatedModel.lastAppliedQuery != "test" {
 		t.Errorf("Expected lastAppliedQuery to be preserved as 'test', got '%s'", finalUpdatedModel.lastAppliedQuery)
 	}
-	
+
 	// Check that search mode is still false
 	if finalUpdatedModel.isSearchMode {
 		t.Error("Expected search mode to remain false after file reload")
 	}
-	
+
 	// Check that searchQuery is still empty
 	if finalUpdatedModel.searchQuery != "" {
 		t.Errorf("Expected searchQuery to remain empty, got '%s'", finalUpdatedModel.searchQuery)

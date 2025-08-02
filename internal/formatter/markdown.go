@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/annenpolka/cclog/pkg/types"
+	"github.com/annenpolka/cclog/internal/domain"
 )
 
 // FormatOptions controls how messages are formatted
@@ -16,7 +16,7 @@ type FormatOptions struct {
 }
 
 // FormatConversationToMarkdown converts a single conversation log to markdown with optional FormatOptions
-func FormatConversationToMarkdown(log *types.ConversationLog, options ...FormatOptions) string {
+func FormatConversationToMarkdown(log *domain.ConversationLog, options ...FormatOptions) string {
 	opt := FormatOptions{ShowUUID: false}
 	if len(options) > 0 {
 		opt = options[0]
@@ -29,7 +29,7 @@ func FormatConversationToMarkdown(log *types.ConversationLog, options ...FormatO
 	sb.WriteString(fmt.Sprintf("**Messages:** %d\n\n", len(log.Messages)))
 
 	// Sort messages by timestamp for chronological order
-	messages := make([]types.Message, len(log.Messages))
+	messages := make([]domain.Message, len(log.Messages))
 	copy(messages, log.Messages)
 	sort.Slice(messages, func(i, j int) bool {
 		return messages[i].Timestamp.Before(messages[j].Timestamp)
@@ -49,7 +49,7 @@ func FormatConversationToMarkdown(log *types.ConversationLog, options ...FormatO
 }
 
 // FormatMultipleConversationsToMarkdown converts multiple conversation logs to markdown with optional FormatOptions
-func FormatMultipleConversationsToMarkdown(logs []*types.ConversationLog, options ...FormatOptions) string {
+func FormatMultipleConversationsToMarkdown(logs []*domain.ConversationLog, options ...FormatOptions) string {
 	opt := FormatOptions{ShowUUID: false}
 	if len(options) > 0 {
 		opt = options[0]
@@ -75,7 +75,7 @@ func FormatMultipleConversationsToMarkdown(logs []*types.ConversationLog, option
 		sb.WriteString(fmt.Sprintf("## %s\n\n", filename))
 
 		// Sort messages by timestamp
-		messages := make([]types.Message, len(log.Messages))
+		messages := make([]domain.Message, len(log.Messages))
 		copy(messages, log.Messages)
 		sort.Slice(messages, func(i, j int) bool {
 			return messages[i].Timestamp.Before(messages[j].Timestamp)
@@ -96,7 +96,7 @@ func FormatMultipleConversationsToMarkdown(logs []*types.ConversationLog, option
 }
 
 // formatMessage formats a single message to markdown with optional FormatOptions
-func formatMessage(msg types.Message, options ...FormatOptions) string {
+func formatMessage(msg domain.Message, options ...FormatOptions) string {
 	opt := FormatOptions{ShowUUID: false}
 	if len(options) > 0 {
 		opt = options[0]

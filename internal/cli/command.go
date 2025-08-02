@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/annenpolka/cclog/internal/domain"
 	"github.com/annenpolka/cclog/internal/formatter"
 	"github.com/annenpolka/cclog/internal/parser"
-	"github.com/annenpolka/cclog/pkg/types"
 )
 
 // Config represents command-line configuration
@@ -155,9 +155,19 @@ func RunCommand(config Config) (string, error) {
 		}
 
 		// Apply filtering to all logs
-		filteredLogs := make([]*types.ConversationLog, len(logs))
+		filteredLogs := make([]*domain.ConversationLog, len(logs))
 		for i, log := range logs {
-			filteredLogs[i] = formatter.FilterConversationLog(log, !config.IncludeAll)
+			// NOTE: Keep as domain throughout
+			dFiltered := &domain.ConversationLog{
+				FilePath: log.FilePath,
+				Messages: make([]domain.Message, 0, len(log.Messages)),
+			}
+			for _, m := range log.Messages {
+				if formatter.IsContentfulMessage(m) || config.IncludeAll {
+					dFiltered.Messages = append(dFiltered.Messages, m)
+				}
+			}
+			filteredLogs[i] = dFiltered
 		}
 
 		markdown = formatter.FormatMultipleConversationsToMarkdown(filteredLogs, formatter.FormatOptions{
@@ -167,7 +177,7 @@ func RunCommand(config Config) (string, error) {
 
 		// Add title if requested
 		if config.ShowTitle && len(filteredLogs) > 0 {
-			title := types.ExtractTitle(filteredLogs[0])
+			title := domain.ExtractTitle(filteredLogs[0])
 			markdown = fmt.Sprintf("# %s\n\n%s", title, markdown)
 		}
 	} else {
@@ -177,8 +187,16 @@ func RunCommand(config Config) (string, error) {
 			return "", fmt.Errorf("failed to parse file: %w", err)
 		}
 
-		// Apply filtering
-		filteredLog := formatter.FilterConversationLog(log, !config.IncludeAll)
+		// Apply filtering (stay in domain.*)
+		filteredLog := &domain.ConversationLog{
+			FilePath: log.FilePath,
+			Messages: make([]domain.Message, 0, len(log.Messages)),
+		}
+		for _, m := range log.Messages {
+			if formatter.IsContentfulMessage(m) || config.IncludeAll {
+				filteredLog.Messages = append(filteredLog.Messages, m)
+			}
+		}
 		markdown = formatter.FormatConversationToMarkdown(filteredLog, formatter.FormatOptions{
 			ShowUUID:         config.ShowUUID,
 			ShowPlaceholders: config.IncludeAll,
@@ -186,7 +204,7 @@ func RunCommand(config Config) (string, error) {
 
 		// Add title if requested
 		if config.ShowTitle {
-			title := types.ExtractTitle(filteredLog)
+			title := domain.ExtractTitle(filteredLog)
 			markdown = fmt.Sprintf("# %s\n\n%s", title, markdown)
 		}
 	}

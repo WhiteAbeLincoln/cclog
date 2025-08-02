@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/annenpolka/cclog/pkg/types"
+	"github.com/annenpolka/cclog/internal/domain"
 )
 
 func TestFileInfo_FilterValue(t *testing.T) {
@@ -975,13 +975,13 @@ func TestSearchInConversation(t *testing.T) {
 	tests := []struct {
 		name     string
 		query    string
-		messages []types.Message
+		messages []domain.Message
 		expected bool
 	}{
 		{
 			name:  "マッチする場合",
 			query: "hello world",
-			messages: []types.Message{
+			messages: []domain.Message{
 				{Message: map[string]interface{}{"content": "hello world this is a test"}},
 				{Message: map[string]interface{}{"content": "another message"}},
 			},
@@ -990,7 +990,7 @@ func TestSearchInConversation(t *testing.T) {
 		{
 			name:  "マッチしない場合",
 			query: "nonexistent",
-			messages: []types.Message{
+			messages: []domain.Message{
 				{Message: map[string]interface{}{"content": "hello world this is a test"}},
 				{Message: map[string]interface{}{"content": "another message"}},
 			},
@@ -999,13 +999,13 @@ func TestSearchInConversation(t *testing.T) {
 		{
 			name:     "空のメッセージ",
 			query:    "hello",
-			messages: []types.Message{},
+			messages: []domain.Message{},
 			expected: false,
 		},
 		{
 			name:  "大文字小文字を区別しない検索",
 			query: "HELLO",
-			messages: []types.Message{
+			messages: []domain.Message{
 				{Message: map[string]interface{}{"content": "hello world"}},
 			},
 			expected: true,
@@ -1024,7 +1024,7 @@ func TestSearchInConversation(t *testing.T) {
 
 func TestFilterFilesBySearch(t *testing.T) {
 	tempDir := t.TempDir()
-	
+
 	// テスト用のJSONLファイルを作成
 	file1 := filepath.Join(tempDir, "conversation1.jsonl")
 	content1 := `{"type":"conversation_start","message":{"content":"hello world","uuid":"123"}}
@@ -1083,7 +1083,7 @@ func TestFilterFilesBySearch(t *testing.T) {
 					jsonlCount++
 				}
 			}
-			
+
 			if jsonlCount != tt.expected {
 				t.Errorf("FilterFilesBySearch() returned %d JSONL files, want %d", jsonlCount, tt.expected)
 			}

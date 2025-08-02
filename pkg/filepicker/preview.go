@@ -1,13 +1,14 @@
 package filepicker
 
 import (
+	"os"
+	"strings"
+
 	"github.com/annenpolka/cclog/internal/formatter"
 	"github.com/annenpolka/cclog/internal/parser"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/philistino/teacup/markdown"
-	"os"
-	"strings"
 )
 
 type PreviewModel struct {

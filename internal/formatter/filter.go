@@ -3,11 +3,11 @@ package formatter
 import (
 	"strings"
 
-	"github.com/annenpolka/cclog/pkg/types"
+	"github.com/annenpolka/cclog/internal/domain"
 )
 
 // IsContentfulMessage determines if a message contains meaningful content
-func IsContentfulMessage(msg types.Message) bool {
+func IsContentfulMessage(msg domain.Message) bool {
 	// Filter out system messages
 	if msg.Type == "system" {
 		return false
@@ -65,12 +65,12 @@ func IsContentfulMessage(msg types.Message) bool {
 }
 
 // FilterMessages filters a slice of messages based on content quality
-func FilterMessages(messages []types.Message, enableFiltering bool) []types.Message {
+func FilterMessages(messages []domain.Message, enableFiltering bool) []domain.Message {
 	if !enableFiltering {
 		return messages
 	}
 
-	var filtered []types.Message
+	var filtered []domain.Message
 	for _, msg := range messages {
 		if IsContentfulMessage(msg) {
 			filtered = append(filtered, msg)
@@ -80,8 +80,8 @@ func FilterMessages(messages []types.Message, enableFiltering bool) []types.Mess
 }
 
 // FilterConversationLog filters messages in a conversation log
-func FilterConversationLog(log *types.ConversationLog, enableFiltering bool) *types.ConversationLog {
-	return &types.ConversationLog{
+func FilterConversationLog(log *domain.ConversationLog, enableFiltering bool) *domain.ConversationLog {
+	return &domain.ConversationLog{
 		Messages: FilterMessages(log.Messages, enableFiltering),
 		FilePath: log.FilePath,
 	}

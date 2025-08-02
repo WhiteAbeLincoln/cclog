@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/annenpolka/cclog/pkg/types"
+	"github.com/annenpolka/cclog/internal/domain"
 )
 
 func TestIsContentfulMessage(t *testing.T) {
@@ -12,12 +12,12 @@ func TestIsContentfulMessage(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		message  types.Message
+		message  domain.Message
 		expected bool
 	}{
 		{
 			name: "normal user message",
-			message: types.Message{
+			message: domain.Message{
 				Type:      "user",
 				Timestamp: timestamp,
 				Message: map[string]interface{}{
@@ -29,7 +29,7 @@ func TestIsContentfulMessage(t *testing.T) {
 		},
 		{
 			name: "normal assistant message",
-			message: types.Message{
+			message: domain.Message{
 				Type:      "assistant",
 				Timestamp: timestamp,
 				Message: map[string]interface{}{
@@ -46,7 +46,7 @@ func TestIsContentfulMessage(t *testing.T) {
 		},
 		{
 			name: "system message should be filtered",
-			message: types.Message{
+			message: domain.Message{
 				Type:      "system",
 				Timestamp: timestamp,
 				Message: map[string]interface{}{
@@ -58,7 +58,7 @@ func TestIsContentfulMessage(t *testing.T) {
 		},
 		{
 			name: "empty message should be filtered",
-			message: types.Message{
+			message: domain.Message{
 				Type:      "assistant",
 				Timestamp: timestamp,
 				Message:   map[string]interface{}{},
@@ -67,7 +67,7 @@ func TestIsContentfulMessage(t *testing.T) {
 		},
 		{
 			name: "API error message should be filtered",
-			message: types.Message{
+			message: domain.Message{
 				Type:      "assistant",
 				Timestamp: timestamp,
 				Message: map[string]interface{}{
@@ -79,7 +79,7 @@ func TestIsContentfulMessage(t *testing.T) {
 		},
 		{
 			name: "interrupted request should be filtered",
-			message: types.Message{
+			message: domain.Message{
 				Type:      "user",
 				Timestamp: timestamp,
 				Message: map[string]interface{}{
@@ -91,7 +91,7 @@ func TestIsContentfulMessage(t *testing.T) {
 		},
 		{
 			name: "command message should be filtered",
-			message: types.Message{
+			message: domain.Message{
 				Type:      "user",
 				Timestamp: timestamp,
 				Message: map[string]interface{}{
@@ -103,7 +103,7 @@ func TestIsContentfulMessage(t *testing.T) {
 		},
 		{
 			name: "bash input should be filtered",
-			message: types.Message{
+			message: domain.Message{
 				Type:      "user",
 				Timestamp: timestamp,
 				Message: map[string]interface{}{
@@ -115,7 +115,7 @@ func TestIsContentfulMessage(t *testing.T) {
 		},
 		{
 			name: "meta message should be filtered",
-			message: types.Message{
+			message: domain.Message{
 				Type:      "user",
 				Timestamp: timestamp,
 				IsMeta:    true,
@@ -128,7 +128,7 @@ func TestIsContentfulMessage(t *testing.T) {
 		},
 		{
 			name: "summary message should be filtered",
-			message: types.Message{
+			message: domain.Message{
 				Type:      "summary",
 				Timestamp: timestamp,
 				Message: map[string]interface{}{
@@ -139,7 +139,7 @@ func TestIsContentfulMessage(t *testing.T) {
 		},
 		{
 			name: "message with only UUID should be filtered",
-			message: types.Message{
+			message: domain.Message{
 				Type:      "assistant",
 				Timestamp: timestamp,
 				UUID:      "some-uuid",
@@ -162,7 +162,7 @@ func TestIsContentfulMessage(t *testing.T) {
 func TestFilterMessages(t *testing.T) {
 	timestamp, _ := time.Parse(time.RFC3339, "2025-07-06T05:01:29.618Z")
 
-	messages := []types.Message{
+	messages := []domain.Message{
 		{
 			Type:      "user",
 			Timestamp: timestamp,
@@ -211,9 +211,9 @@ func TestFilterMessages(t *testing.T) {
 func TestFilterConversationLog(t *testing.T) {
 	timestamp, _ := time.Parse(time.RFC3339, "2025-07-06T05:01:29.618Z")
 
-	log := &types.ConversationLog{
+	log := &domain.ConversationLog{
 		FilePath: "/test/path.jsonl",
-		Messages: []types.Message{
+		Messages: []domain.Message{
 			{
 				Type:      "user",
 				Timestamp: timestamp,

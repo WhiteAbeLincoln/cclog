@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/annenpolka/cclog/internal/domain"
 	"github.com/annenpolka/cclog/internal/formatter"
 	"github.com/annenpolka/cclog/internal/parser"
-	"github.com/annenpolka/cclog/pkg/types"
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -336,7 +336,7 @@ func (m Model) View() string {
 	if m.terminalWidth > 0 && len(dirPath) > m.terminalWidth-20 { // Reserve space for emoji, modes, and spaces
 		availableWidth := m.terminalWidth - 20 // "📁 " + modes + "..."
 		if availableWidth > 0 {
-			dirPath = types.TruncateTitle(dirPath, availableWidth)
+			dirPath = domain.TruncateTitle(dirPath, availableWidth)
 		}
 	}
 
@@ -395,7 +395,7 @@ func (m Model) View() string {
 		availableWidth := m.terminalWidth - prefixWidth
 
 		// Truncate title first, then apply colorful styling
-		truncatedTitle := types.TruncateTitle(title, m.maxTitleChars)
+		truncatedTitle := domain.TruncateTitle(title, m.maxTitleChars)
 		styledTitle := m.getStyledTitle(truncatedTitle, file.IsDir, i == m.cursor)
 
 		// Create responsive content line
@@ -782,7 +782,7 @@ func (m Model) formatResponsiveLine(cursor, title string, availableWidth int) st
 	}
 
 	// Use dynamic title character limit instead of fixed truncation
-	formattedTitle := types.TruncateTitle(title, m.maxTitleChars)
+	formattedTitle := domain.TruncateTitle(title, m.maxTitleChars)
 
 	// Create the display line
 	line := cursor + " " + formattedTitle
@@ -1003,12 +1003,12 @@ func copySessionID(filePath string) tea.Cmd {
 // applySearchFilter は検索クエリに基づいてファイルをフィルタリングする
 func (m *Model) applySearchFilter() {
 	queryToUse := m.searchQuery
-	
+
 	// 検索クエリが空だが、最後に適用されたクエリがある場合は、それを使用してフィルタ状態を維持
 	if queryToUse == "" && m.lastAppliedQuery != "" {
 		queryToUse = m.lastAppliedQuery
 	}
-	
+
 	if queryToUse == "" {
 		// 検索クエリが空の場合はすべてのファイルを表示
 		m.filteredFiles = m.files
@@ -1061,11 +1061,11 @@ func (m *Model) executeDelayedSearch() {
 func (m *Model) handleSearchModeNavigation(direction string) []tea.Cmd {
 	var cmds []tea.Cmd
 	currentFiles := m.filteredFiles
-	
+
 	if len(currentFiles) == 0 {
 		return cmds
 	}
-	
+
 	// Handle navigation based on direction (only up/down, not j/k)
 	switch direction {
 	case "up":
@@ -1077,17 +1077,17 @@ func (m *Model) handleSearchModeNavigation(direction string) []tea.Cmd {
 			m.cursor++
 		}
 	}
-	
+
 	// Ensure cursor visibility after movement
 	m.ensureCursorVisible()
-	
+
 	// Update preview if visible
 	if m.preview.IsVisible() {
 		if cmd := m.updatePreviewContent(); cmd != nil {
 			cmds = append(cmds, cmd)
 		}
 	}
-	
+
 	return cmds
 }
 
@@ -1096,7 +1096,7 @@ func (m *Model) handleEnterAction(currentFiles []FileInfo) tea.Cmd {
 	if len(currentFiles) == 0 {
 		return nil
 	}
-	
+
 	selectedItem := currentFiles[m.cursor]
 	if selectedItem.IsDir {
 		// Navigate into directory

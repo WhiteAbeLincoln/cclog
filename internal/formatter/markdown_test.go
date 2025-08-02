@@ -5,16 +5,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/annenpolka/cclog/pkg/types"
+	"github.com/annenpolka/cclog/internal/domain"
 )
 
 func TestFormatConversationToMarkdownWithoutUUID(t *testing.T) {
 	// Test default behavior (no UUID)
 	timestamp1, _ := time.Parse(time.RFC3339, "2025-07-06T05:01:29.618Z")
 
-	log := &types.ConversationLog{
+	log := &domain.ConversationLog{
 		FilePath: "/test/path/sample.jsonl",
-		Messages: []types.Message{
+		Messages: []domain.Message{
 			{
 				Type:      "user",
 				UUID:      "user-uuid-1",
@@ -43,9 +43,9 @@ func TestFormatConversationToMarkdownWithUUID(t *testing.T) {
 	// Test with UUID enabled
 	timestamp1, _ := time.Parse(time.RFC3339, "2025-07-06T05:01:29.618Z")
 
-	log := &types.ConversationLog{
+	log := &domain.ConversationLog{
 		FilePath: "/test/path/sample.jsonl",
-		Messages: []types.Message{
+		Messages: []domain.Message{
 			{
 				Type:      "user",
 				UUID:      "user-uuid-1",
@@ -71,9 +71,9 @@ func TestFormatConversationToMarkdown(t *testing.T) {
 	timestamp1, _ := time.Parse(time.RFC3339, "2025-07-06T05:01:29.618Z")
 	timestamp2, _ := time.Parse(time.RFC3339, "2025-07-06T05:01:44.663Z")
 
-	log := &types.ConversationLog{
+	log := &domain.ConversationLog{
 		FilePath: "/test/path/sample.jsonl",
-		Messages: []types.Message{
+		Messages: []domain.Message{
 			{
 				Type:      "user",
 				UUID:      "user-uuid-1",
@@ -141,10 +141,10 @@ func TestFormatConversationToMarkdown(t *testing.T) {
 func TestFormatMultipleConversationsToMarkdown(t *testing.T) {
 	timestamp1, _ := time.Parse(time.RFC3339, "2025-07-06T05:01:29.618Z")
 
-	logs := []*types.ConversationLog{
+	logs := []*domain.ConversationLog{
 		{
 			FilePath: "/test/log1.jsonl",
-			Messages: []types.Message{
+			Messages: []domain.Message{
 				{
 					Type:      "user",
 					UUID:      "user-uuid-1",
@@ -158,7 +158,7 @@ func TestFormatMultipleConversationsToMarkdown(t *testing.T) {
 		},
 		{
 			FilePath: "/test/log2.jsonl",
-			Messages: []types.Message{
+			Messages: []domain.Message{
 				{
 					Type:      "user",
 					UUID:      "user-uuid-2",

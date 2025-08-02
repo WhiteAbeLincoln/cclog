@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/annenpolka/cclog/internal/domain"
 	"github.com/annenpolka/cclog/internal/formatter"
 	"github.com/annenpolka/cclog/internal/parser"
-	"github.com/annenpolka/cclog/pkg/types"
 )
 
 type FileInfo struct {
@@ -171,8 +171,8 @@ func extractConversationInfo(filePath string) (string, string) {
 	}
 
 	// Apply filtering to check if any meaningful messages remain after filtering
-	filteredLog := &types.ConversationLog{
-		Messages: make([]types.Message, 0),
+	filteredLog := &domain.ConversationLog{
+		Messages: make([]domain.Message, 0),
 		FilePath: log.FilePath,
 	}
 
@@ -190,7 +190,7 @@ func extractConversationInfo(filePath string) (string, string) {
 	}
 
 	// Extract title using existing title extraction logic
-	title := types.ExtractTitle(filteredLog)
+	title := domain.ExtractTitle(filteredLog)
 	return title, projectName
 }
 
@@ -309,20 +309,20 @@ func extractProjectName(cwd string) string {
 }
 
 // SearchInConversation はメッセージ内容から検索クエリをマッチングする
-func SearchInConversation(query string, messages []types.Message) bool {
+func SearchInConversation(query string, messages []domain.Message) bool {
 	if query == "" {
 		return true
 	}
-	
+
 	lowerQuery := strings.ToLower(query)
-	
+
 	for _, msg := range messages {
 		content := formatter.ExtractMessageContent(&msg)
 		if strings.Contains(strings.ToLower(content), lowerQuery) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -331,31 +331,31 @@ func FilterFilesBySearch(query string, files []FileInfo) []FileInfo {
 	if query == "" {
 		return files
 	}
-	
+
 	var result []FileInfo
-	
+
 	for _, file := range files {
 		// ディレクトリは常に含める
 		if file.IsDir {
 			result = append(result, file)
 			continue
 		}
-		
+
 		// JSONLファイル以外はスキップ
 		if !strings.HasSuffix(file.Name, ".jsonl") {
 			continue
 		}
-		
+
 		// JSONLファイルを解析して検索
 		conversationLog, err := parser.ParseJSONLFile(file.Path)
 		if err != nil {
 			continue
 		}
-		
+
 		if SearchInConversation(query, conversationLog.Messages) {
 			result = append(result, file)
 		}
 	}
-	
+
 	return result
 }
