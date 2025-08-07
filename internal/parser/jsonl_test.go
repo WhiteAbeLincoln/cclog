@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/annenpolka/cclog/internal/testutil"
 )
 
 func TestParseJSONLFile(t *testing.T) {
@@ -15,54 +17,36 @@ func TestParseJSONLFile(t *testing.T) {
 		t.Fatalf("Failed to parse JSONL file: %v", err)
 	}
 
-	if len(log.Messages) != 11 {
-		t.Errorf("Expected 11 messages, got %d", len(log.Messages))
-	}
+	testutil.Diff(t, 11, len(log.Messages))
 
 	// Test first message (meta message)
 	firstMsg := log.Messages[0]
-	if firstMsg.Type != "user" {
-		t.Errorf("Expected first message type 'user', got '%s'", firstMsg.Type)
-	}
+	testutil.Diff(t, "user", firstMsg.Type)
 
-	if firstMsg.SessionID != "41eb70c6-2cac-4420-834b-ceaea98a7494" {
-		t.Errorf("Expected sessionId '41eb70c6-2cac-4420-834b-ceaea98a7494', got '%s'", firstMsg.SessionID)
-	}
+	testutil.Diff(t, "41eb70c6-2cac-4420-834b-ceaea98a7494", firstMsg.SessionID)
 
-	if !firstMsg.IsMeta {
-		t.Errorf("Expected first message to be meta")
-	}
+	testutil.True(t, firstMsg.IsMeta)
 
 	// Test real user message
 	userMsg := log.Messages[3]
-	if userMsg.Type != "user" {
-		t.Errorf("Expected user message type 'user', got '%s'", userMsg.Type)
-	}
+	testutil.Diff(t, "user", userMsg.Type)
 
 	// Test assistant message
 	assistantMsg := log.Messages[4]
-	if assistantMsg.Type != "assistant" {
-		t.Errorf("Expected assistant message type 'assistant', got '%s'", assistantMsg.Type)
-	}
+	testutil.Diff(t, "assistant", assistantMsg.Type)
 
 	// Test summary message
 	summaryMsg := log.Messages[9]
-	if summaryMsg.Type != "summary" {
-		t.Errorf("Expected summary message type 'summary', got '%s'", summaryMsg.Type)
-	}
+	testutil.Diff(t, "summary", summaryMsg.Type)
 
 	// Test system message
 	systemMsg := log.Messages[10]
-	if systemMsg.Type != "system" {
-		t.Errorf("Expected system message type 'system', got '%s'", systemMsg.Type)
-	}
+	testutil.Diff(t, "system", systemMsg.Type)
 }
 
 func TestParseJSONLFileNotFound(t *testing.T) {
 	_, err := ParseJSONLFile("nonexistent.jsonl")
-	if err == nil {
-		t.Error("Expected error for non-existent file")
-	}
+	testutil.Diff(t, true, err != nil)
 }
 
 func TestParseJSONLDirectory(t *testing.T) {
@@ -73,13 +57,9 @@ func TestParseJSONLDirectory(t *testing.T) {
 		t.Fatalf("Failed to parse JSONL directory: %v", err)
 	}
 
-	if len(logs) != 1 {
-		t.Errorf("Expected 1 log file, got %d", len(logs))
-	}
+	testutil.Diff(t, 1, len(logs))
 
-	if len(logs[0].Messages) != 11 {
-		t.Errorf("Expected 11 messages in first log, got %d", len(logs[0].Messages))
-	}
+	testutil.Diff(t, 11, len(logs[0].Messages))
 }
 
 func TestParseJSONLFileLargeLines(t *testing.T) {
@@ -106,17 +86,13 @@ func TestParseJSONLFileLargeLines(t *testing.T) {
 		t.Fatalf("Failed to parse JSONL file with large lines: %v", err)
 	}
 
-	if len(log.Messages) != 2 {
-		t.Errorf("Expected 2 messages, got %d", len(log.Messages))
-	}
+	testutil.Diff(t, 2, len(log.Messages))
 
 	// Verify the large message was parsed correctly
 	// Message.Message is interface{}, need to cast to map for content access
 	if msg, ok := log.Messages[0].Message.(map[string]interface{}); ok {
 		if content, ok := msg["content"].(string); ok {
-			if len(content) != 80*1024 {
-				t.Errorf("Expected large message content length %d, got %d", 80*1024, len(content))
-			}
+			testutil.Diff(t, 80*1024, len(content))
 		} else {
 			t.Error("Failed to extract content from large message")
 		}
@@ -127,9 +103,7 @@ func TestParseJSONLFileLargeLines(t *testing.T) {
 	// Verify the normal message was also parsed
 	if msg, ok := log.Messages[1].Message.(map[string]interface{}); ok {
 		if content, ok := msg["content"].(string); ok {
-			if content != "normal message" {
-				t.Errorf("Expected normal message content 'normal message', got '%s'", content)
-			}
+			testutil.Diff(t, "normal message", content)
 		} else {
 			t.Error("Failed to extract content from normal message")
 		}
@@ -153,9 +127,7 @@ func TestParseJSONLFileEmpty(t *testing.T) {
 		t.Fatalf("Failed to parse empty JSONL file: %v", err)
 	}
 
-	if len(log.Messages) != 0 {
-		t.Errorf("Expected 0 messages for empty file, got %d", len(log.Messages))
-	}
+	testutil.Diff(t, 0, len(log.Messages))
 }
 
 func TestParseJSONLDirectoryWithEmptyFiles(t *testing.T) {

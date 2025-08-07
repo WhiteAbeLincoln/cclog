@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/annenpolka/cclog/internal/domain"
+	"github.com/annenpolka/cclog/internal/testutil"
 )
 
 func TestIsContentfulMessage(t *testing.T) {
@@ -152,9 +153,7 @@ func TestIsContentfulMessage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := IsContentfulMessage(tt.message)
-			if result != tt.expected {
-				t.Errorf("IsContentfulMessage() = %v, want %v", result, tt.expected)
-			}
+			testutil.Diff(t, tt.expected, result)
 		})
 	}
 }
@@ -196,16 +195,12 @@ func TestFilterMessages(t *testing.T) {
 
 	filtered := FilterMessages(messages, true)
 
-	if len(filtered) != 2 {
-		t.Errorf("Expected 2 filtered messages, got %d", len(filtered))
-	}
+	testutil.Diff(t, 2, len(filtered))
 
 	// Test with filtering disabled
 	unfiltered := FilterMessages(messages, false)
 
-	if len(unfiltered) != 4 {
-		t.Errorf("Expected 4 unfiltered messages, got %d", len(unfiltered))
-	}
+	testutil.Diff(t, 4, len(unfiltered))
 }
 
 func TestFilterConversationLog(t *testing.T) {
@@ -235,11 +230,7 @@ func TestFilterConversationLog(t *testing.T) {
 
 	filtered := FilterConversationLog(log, true)
 
-	if len(filtered.Messages) != 1 {
-		t.Errorf("Expected 1 filtered message, got %d", len(filtered.Messages))
-	}
+	testutil.Diff(t, 1, len(filtered.Messages))
 
-	if filtered.FilePath != log.FilePath {
-		t.Errorf("Expected filepath to be preserved")
-	}
+	testutil.Diff(t, log.FilePath, filtered.FilePath)
 }

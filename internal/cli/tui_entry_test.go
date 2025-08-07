@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/annenpolka/cclog/internal/testutil"
 	"github.com/annenpolka/cclog/pkg/filepicker"
 	"github.com/charmbracelet/x/exp/teatest"
 )
@@ -19,7 +20,5 @@ func TestRunTUI_WithTeatest(t *testing.T) {
 
 	// Verify the model exists and test completed
 	finalModel := tm.FinalModel(t)
-	if finalModel == nil {
-		t.Error("Expected final model to exist")
-	}
+	testutil.Diff(t, false, finalModel == nil)
 }

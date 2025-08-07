@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/annenpolka/cclog/internal/domain"
+	"github.com/annenpolka/cclog/internal/testutil"
 )
 
 func TestFormatConversationToMarkdownWithoutUUID(t *testing.T) {
@@ -232,9 +233,7 @@ func TestExtractMessageContent(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ExtractMessageContent(tt.message)
-			if result != tt.expected {
-				t.Errorf("ExtractMessageContent() = %v, want %v", result, tt.expected)
-			}
+			testutil.Diff(t, tt.expected, result)
 		})
 	}
 }
@@ -333,15 +332,11 @@ func TestExtractMessageContentWithPlaceholders(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test without placeholders (current behavior)
 			result := ExtractMessageContent(tt.message)
-			if result != tt.expectedWithout {
-				t.Errorf("ExtractMessageContent() without placeholders = %v, want %v", result, tt.expectedWithout)
-			}
+			testutil.Diff(t, tt.expectedWithout, result)
 
 			// Test with placeholders (new behavior)
 			result = ExtractMessageContent(tt.message, tt.showPlaceholders)
-			if result != tt.expectedWith {
-				t.Errorf("ExtractMessageContent() with placeholders = %v, want %v", result, tt.expectedWith)
-			}
+			testutil.Diff(t, tt.expectedWith, result)
 		})
 	}
 }

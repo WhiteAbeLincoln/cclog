@@ -2,6 +2,8 @@ package filepicker
 
 import (
 	"testing"
+
+	"github.com/annenpolka/cclog/internal/testutil"
 )
 
 func TestCopySessionID(t *testing.T) {
@@ -35,18 +37,9 @@ func TestCopySessionID(t *testing.T) {
 
 			// Check if the result is of the expected type
 			result, ok := msg.(copySessionIDMsg)
-			if !ok {
-				t.Errorf("Expected copySessionIDMsg, got %T", msg)
-				return
-			}
-
+			testutil.True(t, ok)
 			// Check if error expectation matches
-			if tt.wantErr && result.error == nil {
-				t.Errorf("Expected error but got none")
-			}
-			if !tt.wantErr && result.error != nil {
-				t.Errorf("Expected no error but got: %v", result.error)
-			}
+			testutil.Diff(t, tt.wantErr, result.error != nil)
 		})
 	}
 }
@@ -64,19 +57,10 @@ func TestCopySessionIDIntegration(t *testing.T) {
 
 	// Check if the result is of the expected type
 	result, ok := msg.(copySessionIDMsg)
-	if !ok {
-		t.Errorf("Expected copySessionIDMsg, got %T", msg)
-		return
-	}
-
+	testutil.True(t, ok)
 	// For a valid file, we should get a successful result
-	if result.error != nil {
-		t.Errorf("Expected no error but got: %v", result.error)
-	}
-
-	if !result.success {
-		t.Errorf("Expected success=true but got success=false")
-	}
+	testutil.Diff(t, false, result.error != nil)
+	testutil.True(t, result.success)
 }
 
 func TestCopySessionIDErrorHandling(t *testing.T) {
@@ -110,18 +94,9 @@ func TestCopySessionIDErrorHandling(t *testing.T) {
 
 			// Check if the result is of the expected type
 			result, ok := msg.(copySessionIDMsg)
-			if !ok {
-				t.Errorf("Expected copySessionIDMsg, got %T", msg)
-				return
-			}
-
+			testutil.True(t, ok)
 			// Check if error expectation matches
-			if tt.wantErr && result.error == nil {
-				t.Errorf("Expected error but got none")
-			}
-			if !tt.wantErr && result.error != nil {
-				t.Errorf("Expected no error but got: %v", result.error)
-			}
+			testutil.Diff(t, tt.wantErr, result.error != nil)
 		})
 	}
 }

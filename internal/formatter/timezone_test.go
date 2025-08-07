@@ -4,21 +4,19 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/annenpolka/cclog/internal/testutil"
 )
 
 func TestGetSystemTimezone(t *testing.T) {
 	// Test basic functionality
 	tz := GetSystemTimezone()
-	if tz == nil {
-		t.Error("GetSystemTimezone() should not return nil")
-	}
+	testutil.Diff(t, false, tz == nil)
 
 	// Test that it returns a valid timezone
 	now := time.Now()
 	locTime := now.In(tz)
-	if locTime.IsZero() {
-		t.Error("Timezone should be able to format time")
-	}
+	testutil.Diff(t, false, locTime.IsZero())
 }
 
 func TestGetSystemTimezoneWithEnvironmentVariable(t *testing.T) {
@@ -37,10 +35,9 @@ func TestGetSystemTimezoneWithEnvironmentVariable(t *testing.T) {
 	}()
 
 	// Test that function returns time.Local
-	tz := GetSystemTimezone()
-	if tz != time.Local {
-		t.Error("GetSystemTimezone() should return time.Local")
-	}
+    tz := GetSystemTimezone()
+    // Compare pointers directly to avoid cmp on unexported fields in time.Location
+    testutil.True(t, tz == time.Local)
 
 	// Test with manual timezone creation to verify our understanding
 	testCases := []struct {
@@ -68,9 +65,7 @@ func TestGetSystemTimezoneWithEnvironmentVariable(t *testing.T) {
 			utcTime := time.Date(2025, 7, 6, tc.utcHour, 0, 0, 0, time.UTC)
 			localTime := utcTime.In(tc.location)
 
-			if localTime.Hour() != tc.expected {
-				t.Errorf("%s: expected %d:00, got %d:00", tc.name, tc.expected, localTime.Hour())
-			}
+			testutil.Diff(t, tc.expected, localTime.Hour())
 		})
 	}
 }
@@ -85,7 +80,5 @@ func TestGetSystemTimezoneDefaultBehavior(t *testing.T) {
 	localTime := now.In(time.Local)
 
 	// They should be the same
-	if ourTime.Format(time.RFC3339) != localTime.Format(time.RFC3339) {
-		t.Errorf("GetSystemTimezone() result should match time.Local behavior")
-	}
+	testutil.Diff(t, localTime.Format(time.RFC3339), ourTime.Format(time.RFC3339))
 }

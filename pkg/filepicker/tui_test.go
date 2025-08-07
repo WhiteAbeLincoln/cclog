@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/annenpolka/cclog/internal/testutil"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -61,10 +62,7 @@ func TestUpdatePreviewSize(t *testing.T) {
 			m.updatePreviewSize()
 
 			// Check if the preview width was set correctly
-			if m.preview.width != tt.expectedPreviewWidth {
-				t.Errorf("Expected preview width %d, got %d. %s",
-					tt.expectedPreviewWidth, m.preview.width, tt.description)
-			}
+			testutil.Diff(t, tt.expectedPreviewWidth, m.preview.width)
 		})
 	}
 }
@@ -98,10 +96,7 @@ func TestCurrentPreviewWidthCalculation(t *testing.T) {
 				previewWidth = 0
 			}
 
-			if previewWidth != tt.currentPreviewWidth {
-				t.Errorf("Current logic test failed. Expected %d, got %d. %s",
-					tt.currentPreviewWidth, previewWidth, tt.description)
-			}
+			testutil.Diff(t, tt.currentPreviewWidth, previewWidth)
 		})
 	}
 }
@@ -138,9 +133,7 @@ func TestColorfulUIStyles(t *testing.T) {
 
 			// Test that the model has colorful styling capability
 			view := m.View()
-			if view == "" {
-				t.Error("View should not be empty")
-			}
+			testutil.Diff(t, false, view == "")
 
 			// Test that cursor position affects styling
 			if tt.cursor == tt.selectedFile {
@@ -180,15 +173,11 @@ func TestDirectoryColorStyling(t *testing.T) {
 			}
 
 			view := m.View()
-			if view == "" {
-				t.Error("View should not be empty")
-			}
+			testutil.Diff(t, false, view == "")
 
 			// Now we check if the styling is actually applied
 			// The view should contain appropriate styling for directories and files
-			if view == "" {
-				t.Error("View should not be empty")
-			}
+			testutil.Diff(t, false, view == "")
 			// Since we've implemented colorful styling, this test should pass
 			// The styling is applied internally via lipgloss
 		})
@@ -250,9 +239,7 @@ func TestSmallScreenScrolling(t *testing.T) {
 
 			// Test that cursor is within visible range
 			listHeight := m.getListHeight()
-			if listHeight <= 0 {
-				t.Errorf("List height should be positive, got %d", listHeight)
-			}
+			testutil.True(t, listHeight > 0)
 
 			// Update maxDisplayFiles based on available space
 			if listHeight > 0 {
@@ -265,10 +252,7 @@ func TestSmallScreenScrolling(t *testing.T) {
 			// Check if cursor is within visible range
 			isVisible := m.cursor >= m.scrollOffset && m.cursor < m.scrollOffset+m.maxDisplayFiles
 
-			if isVisible != tt.expectedVisible {
-				t.Errorf("Expected cursor visibility %v, got %v. Cursor: %d, ScrollOffset: %d, MaxDisplayFiles: %d, ListHeight: %d. %s",
-					tt.expectedVisible, isVisible, m.cursor, m.scrollOffset, m.maxDisplayFiles, listHeight, tt.description)
-			}
+			testutil.Diff(t, tt.expectedVisible, isVisible)
 		})
 	}
 }
@@ -313,10 +297,7 @@ func TestAdaptivePreviewSplit(t *testing.T) {
 
 			listHeight := m.getListHeight()
 
-			if listHeight < tt.expectedMinimumList {
-				t.Errorf("List height %d should be at least %d for usability. %s",
-					listHeight, tt.expectedMinimumList, tt.description)
-			}
+			testutil.True(t, listHeight >= tt.expectedMinimumList)
 		})
 	}
 }
@@ -373,20 +354,11 @@ func TestCopySessionIDKeyHandler(t *testing.T) {
 			sessionId, err := extractSessionID(tt.filePath)
 
 			if tt.expectedErr {
-				if err == nil {
-					t.Errorf("Expected error but got none. %s", tt.description)
-				}
+				testutil.True(t, err != nil)
 				return
 			}
-
-			if err != nil {
-				t.Errorf("Unexpected error: %v. %s", err, tt.description)
-				return
-			}
-
-			if sessionId != tt.expectedResult {
-				t.Errorf("Expected sessionId %q, got %q. %s", tt.expectedResult, sessionId, tt.description)
-			}
+			testutil.Diff(t, false, err != nil)
+			testutil.Diff(t, tt.expectedResult, sessionId)
 		})
 	}
 }
@@ -396,9 +368,7 @@ func TestSearchModeToggle(t *testing.T) {
 	m := NewModel(".", false)
 
 	// 初期状態では検索モードではない
-	if m.isSearchMode {
-		t.Error("初期状態では検索モードでないはず")
-	}
+	testutil.False(t, m.isSearchMode)
 
 	// '/'キーで検索モードに切り替わる
 	msg := tea.KeyMsg{
@@ -410,14 +380,10 @@ func TestSearchModeToggle(t *testing.T) {
 	m = model.(Model)
 	_ = cmd // cmdを使用することを示す
 
-	if !m.isSearchMode {
-		t.Error("'/'キーで検索モードに切り替わるはず")
-	}
+	testutil.True(t, m.isSearchMode)
 
 	// 検索クエリが初期化される
-	if m.searchQuery != "" {
-		t.Error("検索モード開始時、検索クエリは空であるはず")
-	}
+	testutil.Diff(t, "", m.searchQuery)
 }
 
 func TestSearchModeInput(t *testing.T) {
@@ -441,9 +407,7 @@ func TestSearchModeInput(t *testing.T) {
 	}
 
 	expected := "hello"
-	if m.searchQuery != expected {
-		t.Errorf("検索クエリが '%s' であるはずが '%s'", expected, m.searchQuery)
-	}
+	testutil.Diff(t, expected, m.searchQuery)
 }
 
 func TestSearchModeBackspace(t *testing.T) {
@@ -461,9 +425,7 @@ func TestSearchModeBackspace(t *testing.T) {
 	m = model.(Model)
 
 	expected := "hell"
-	if m.searchQuery != expected {
-		t.Errorf("Backspace後の検索クエリが '%s' であるはずが '%s'", expected, m.searchQuery)
-	}
+	testutil.Diff(t, expected, m.searchQuery)
 }
 
 func TestSearchModeBackspaceMultibyte(t *testing.T) {
@@ -490,9 +452,7 @@ func TestSearchModeBackspaceMultibyte(t *testing.T) {
 	m = model.(Model)
 
 	expected = "こんに"
-	if m.searchQuery != expected {
-		t.Errorf("全角文字2回目Backspace後の検索クエリが '%s' であるはずが '%s'", expected, m.searchQuery)
-	}
+	testutil.Diff(t, expected, m.searchQuery)
 }
 
 func TestSearchModeEscape(t *testing.T) {
@@ -753,10 +713,7 @@ func TestSearchModeKeyNavigation(t *testing.T) {
 			updatedModel := model.(Model)
 
 			// Check cursor position
-			if updatedModel.cursor != tt.expectedCursor {
-				t.Errorf("Expected cursor at position %d, got %d. %s",
-					tt.expectedCursor, updatedModel.cursor, tt.description)
-			}
+			testutil.Diff(t, tt.expectedCursor, updatedModel.cursor)
 		})
 	}
 }
@@ -784,14 +741,10 @@ func TestSearchModeKeyNavigationPreviewUpdate(t *testing.T) {
 	updatedModel := model.(Model)
 
 	// Check that cursor moved
-	if updatedModel.cursor != 1 {
-		t.Errorf("Expected cursor at position 1, got %d", updatedModel.cursor)
-	}
+	testutil.Diff(t, 1, updatedModel.cursor)
 
 	// Check that a command was returned (for preview update)
-	if cmd == nil {
-		t.Error("Expected a command to be returned for preview update")
-	}
+	testutil.Diff(t, false, cmd == nil)
 }
 
 // TestSearchModeJKKeysAsInput tests that j/k keys are treated as input in search mode
@@ -860,16 +813,10 @@ func TestSearchModeJKKeysAsInput(t *testing.T) {
 			updatedModel := model.(Model)
 
 			// Check that search query was updated
-			if updatedModel.searchQuery != tt.expectedSearchQuery {
-				t.Errorf("Expected search query '%s', got '%s'. %s",
-					tt.expectedSearchQuery, updatedModel.searchQuery, tt.description)
-			}
+			testutil.Diff(t, tt.expectedSearchQuery, updatedModel.searchQuery)
 
 			// Check that cursor did not move
-			if updatedModel.cursor != initialCursor {
-				t.Errorf("Expected cursor to stay at position %d, but moved to %d. %s",
-					initialCursor, updatedModel.cursor, tt.description)
-			}
+			testutil.Diff(t, initialCursor, updatedModel.cursor)
 		})
 	}
 }
@@ -913,27 +860,21 @@ func TestSearchModeEnterKeepsFiltering(t *testing.T) {
 	updatedModel := model.(Model)
 
 	// Check that search mode is exited
-	if updatedModel.isSearchMode {
-		t.Error("Expected search mode to be false after pressing enter")
-	}
+	testutil.False(t, updatedModel.isSearchMode)
 
 	// Check that search query is cleared
-	if updatedModel.searchQuery != "" {
-		t.Errorf("Expected search query to be cleared, got '%s'", updatedModel.searchQuery)
-	}
+	testutil.Diff(t, "", updatedModel.searchQuery)
 
 	// Check that filtered files are maintained (this is the key requirement)
-	if len(updatedModel.filteredFiles) != 3 {
-		t.Errorf("Expected 3 filtered files to be maintained, got %d", len(updatedModel.filteredFiles))
-	}
+	testutil.Diff(t, 3, len(updatedModel.filteredFiles))
 
 	// Check that the filtered files are the correct ones
 	expectedFiltered := []string{"test1.jsonl", "test2.jsonl", "test3.jsonl"}
 	for i, expected := range expectedFiltered {
-		if i >= len(updatedModel.filteredFiles) || updatedModel.filteredFiles[i].Path != expected {
-			t.Errorf("Expected filtered file[%d] to be '%s', got '%s'",
-				i, expected, updatedModel.filteredFiles[i].Path)
+		if i >= len(updatedModel.filteredFiles) {
+			t.Fatalf("filtered index out of range")
 		}
+		testutil.Diff(t, expected, updatedModel.filteredFiles[i].Path)
 	}
 
 	// Check that cursor position is maintained within the filtered results

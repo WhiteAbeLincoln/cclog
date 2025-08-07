@@ -4,6 +4,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"os"
 	"testing"
+
+	"github.com/annenpolka/cclog/internal/testutil"
 )
 
 func TestPreviewModel_SetContent(t *testing.T) {
@@ -33,10 +35,7 @@ func TestPreviewModel_SetContent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			preview := NewPreviewModel()
 			_ = preview.SetContent(tt.content)
-
-			if preview.GetContent() != tt.expectedContent {
-				t.Errorf("SetContent() = %v, want %v", preview.GetContent(), tt.expectedContent)
-			}
+			testutil.Diff(t, tt.expectedContent, preview.GetContent())
 		})
 	}
 }
@@ -60,10 +59,7 @@ func TestPreviewModel_SetVisible(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			preview := NewPreviewModel()
 			preview.SetVisible(tt.visible)
-
-			if preview.IsVisible() != tt.visible {
-				t.Errorf("SetVisible(%v) = %v, want %v", tt.visible, preview.IsVisible(), tt.visible)
-			}
+			testutil.Diff(t, tt.visible, preview.IsVisible())
 		})
 	}
 }
@@ -92,10 +88,8 @@ func TestPreviewModel_SetSize(t *testing.T) {
 			preview.SetSize(tt.width, tt.height)
 
 			width, height := preview.GetSize()
-			if width != tt.width || height != tt.height {
-				t.Errorf("SetSize(%d, %d) = (%d, %d), want (%d, %d)",
-					tt.width, tt.height, width, height, tt.width, tt.height)
-			}
+			testutil.Diff(t, tt.width, width)
+			testutil.Diff(t, tt.height, height)
 		})
 	}
 }
@@ -130,21 +124,11 @@ func TestGeneratePreview(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			content, err := GeneratePreview(tt.jsonlPath, true)
-
-			if tt.shouldError && err == nil {
-				t.Errorf("GeneratePreview(%s) expected error but got none", tt.jsonlPath)
-			}
-
-			if !tt.shouldError && err != nil {
-				t.Errorf("GeneratePreview(%s) unexpected error: %v", tt.jsonlPath, err)
-			}
-
-			if tt.expectedEmpty && content != "" {
-				t.Errorf("GeneratePreview(%s) expected empty content but got: %s", tt.jsonlPath, content)
-			}
-
-			if !tt.expectedEmpty && !tt.shouldError && content == "" {
-				t.Errorf("GeneratePreview(%s) expected non-empty content but got empty", tt.jsonlPath)
+			testutil.Diff(t, tt.shouldError, err != nil)
+			if tt.expectedEmpty {
+				testutil.Diff(t, "", content)
+			} else if !tt.shouldError {
+				testutil.Diff(t, false, content == "")
 			}
 		})
 	}
@@ -153,18 +137,13 @@ func TestGeneratePreview(t *testing.T) {
 func TestPreviewModel_DefaultState(t *testing.T) {
 	preview := NewPreviewModel()
 
-	if !preview.IsVisible() {
-		t.Errorf("NewPreviewModel() should start with visible=true")
-	}
+	testutil.True(t, preview.IsVisible())
 
-	if preview.GetContent() != "" {
-		t.Errorf("NewPreviewModel() should start with empty content")
-	}
+	testutil.Diff(t, "", preview.GetContent())
 
 	width, height := preview.GetSize()
-	if width != 0 || height != 0 {
-		t.Errorf("NewPreviewModel() should start with size (0, 0), got (%d, %d)", width, height)
-	}
+	testutil.Diff(t, 0, width)
+	testutil.Diff(t, 0, height)
 }
 
 func TestPreviewModel_Cleanup(t *testing.T) {
@@ -174,22 +153,16 @@ func TestPreviewModel_Cleanup(t *testing.T) {
 	_ = preview.SetContent("# Test Content\n\nThis is a test.")
 
 	// Check that temp file was created
-	if preview.tempFile == "" {
-		t.Errorf("SetContent should create a temp file")
-	}
+	testutil.Diff(t, false, preview.tempFile == "")
 
 	// Check temp file exists
-	if _, err := os.Stat(preview.tempFile); os.IsNotExist(err) {
-		t.Errorf("Temp file should exist after SetContent")
-	}
+	_, err := os.Stat(preview.tempFile)
+	testutil.Diff(t, false, os.IsNotExist(err))
 
 	// Cleanup should remove temp file
 	preview.Cleanup()
-
 	// Check temp file is removed
-	if preview.tempFile != "" {
-		t.Errorf("Cleanup should clear tempFile path")
-	}
+	testutil.Diff(t, "", preview.tempFile)
 }
 
 func TestPreviewModel_KeyBindings_GoToTop(t *testing.T) {
@@ -205,16 +178,13 @@ func TestPreviewModel_KeyBindings_GoToTop(t *testing.T) {
 
 	// Simulate scrolling down first (so we have somewhere to scroll back to)
 	preview.markdownBubble.Viewport.ScrollDown(5)
-	initialOffset := preview.markdownBubble.Viewport.YOffset
 
 	// Simulate 'g' key press
 	keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}
 	preview.Update(keyMsg)
 
 	// Check that we're now at the top
-	if preview.markdownBubble.Viewport.YOffset != 0 {
-		t.Errorf("After 'g' key press, should be at top (YOffset=0), got YOffset=%d, initial was %d", preview.markdownBubble.Viewport.YOffset, initialOffset)
-	}
+	testutil.Diff(t, 0, preview.markdownBubble.Viewport.YOffset)
 }
 
 func TestPreviewModel_KeyBindings_GoToBottom(t *testing.T) {
@@ -233,9 +203,7 @@ func TestPreviewModel_KeyBindings_GoToBottom(t *testing.T) {
 	preview.SetSize(80, 10)
 
 	// Initially should be at top
-	if preview.markdownBubble.Viewport.YOffset != 0 {
-		t.Errorf("Should start at top")
-	}
+	testutil.Diff(t, 0, preview.markdownBubble.Viewport.YOffset)
 
 	// Simulate 'G' key press (shift+g)
 	keyMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}}
@@ -248,7 +216,7 @@ func TestPreviewModel_KeyBindings_GoToBottom(t *testing.T) {
 	height := preview.markdownBubble.Viewport.Height
 
 	// For content that's longer than viewport, we should have scrolled down
-	if totalLines > height && finalOffset == 0 {
-		t.Errorf("After 'G' key press, should be at bottom (YOffset>0), got YOffset=%d, totalLines=%d, height=%d", finalOffset, totalLines, height)
+	if totalLines > height {
+		testutil.Diff(t, false, finalOffset == 0)
 	}
 }

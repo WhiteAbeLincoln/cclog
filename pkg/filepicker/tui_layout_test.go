@@ -3,6 +3,7 @@ package filepicker
 import (
 	"testing"
 
+	"github.com/annenpolka/cclog/internal/testutil"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -55,13 +56,8 @@ func TestModelUpdatePreviewSize(t *testing.T) {
 
 			width, height := model.preview.GetSize()
 
-			if width != tt.expectedPreviewWidth {
-				t.Errorf("updatePreviewSize() width = %d, expected %d", width, tt.expectedPreviewWidth)
-			}
-
-			if height != tt.expectedPreviewHeight {
-				t.Errorf("updatePreviewSize() height = %d, expected %d", height, tt.expectedPreviewHeight)
-			}
+			testutil.Diff(t, tt.expectedPreviewWidth, width)
+			testutil.Diff(t, tt.expectedPreviewHeight, height)
 		})
 	}
 }
@@ -113,13 +109,8 @@ func TestModelDynamicLayoutAdjustment(t *testing.T) {
 			listHeight := model.getListHeight()
 			_, previewHeight := model.preview.GetSize()
 
-			if listHeight != tt.expectedListHeight {
-				t.Errorf("updateDynamicLayout() list height = %d, expected %d", listHeight, tt.expectedListHeight)
-			}
-
-			if previewHeight != tt.expectedPreviewHeight {
-				t.Errorf("updateDynamicLayout() preview height = %d, expected %d", previewHeight, tt.expectedPreviewHeight)
-			}
+			testutil.Diff(t, tt.expectedListHeight, listHeight)
+			testutil.Diff(t, tt.expectedPreviewHeight, previewHeight)
 		})
 	}
 }
@@ -133,26 +124,16 @@ func TestModelWindowSizeMessage(t *testing.T) {
 
 	m := updatedModel.(Model)
 
-	if m.terminalWidth != 100 {
-		t.Errorf("WindowSizeMsg update: width = %d, expected %d", m.terminalWidth, 100)
-	}
-
-	if m.terminalHeight != 50 {
-		t.Errorf("WindowSizeMsg update: height = %d, expected %d", m.terminalHeight, 50)
-	}
+	testutil.Diff(t, 100, m.terminalWidth)
+	testutil.Diff(t, 50, m.terminalHeight)
 
 	// Check if preview size was updated
 	width, height := m.preview.GetSize()
 	expectedWidth := 100 // Use full width
 	expectedHeight := 35 // (50 - 6) * 0.8 = 35.2 -> 35
 
-	if width != expectedWidth {
-		t.Errorf("WindowSizeMsg preview width = %d, expected %d", width, expectedWidth)
-	}
-
-	if height != expectedHeight {
-		t.Errorf("WindowSizeMsg preview height = %d, expected %d", height, expectedHeight)
-	}
+	testutil.Diff(t, expectedWidth, width)
+	testutil.Diff(t, expectedHeight, height)
 }
 
 func TestModelResponsiveLayoutThresholds(t *testing.T) {
@@ -202,13 +183,8 @@ func TestModelResponsiveLayoutThresholds(t *testing.T) {
 
 			model.updateDisplaySettings()
 
-			if model.useCompactLayout != tt.expectedCompact {
-				t.Errorf("updateDisplaySettings() compact layout = %v, expected %v", model.useCompactLayout, tt.expectedCompact)
-			}
-
-			if model.maxTitleChars != tt.expectedMaxTitleChars {
-				t.Errorf("updateDisplaySettings() max title chars = %d, expected %d", model.maxTitleChars, tt.expectedMaxTitleChars)
-			}
+			testutil.Diff(t, tt.expectedCompact, model.useCompactLayout)
+			testutil.Diff(t, tt.expectedMaxTitleChars, model.maxTitleChars)
 		})
 	}
 }
@@ -225,11 +201,6 @@ func TestModelMinimumSizeConstraints(t *testing.T) {
 	width, height := model.preview.GetSize()
 
 	// Should handle negative sizes gracefully
-	if width < 0 {
-		t.Errorf("Preview width should not be negative: %d", width)
-	}
-
-	if height < 0 {
-		t.Errorf("Preview height should not be negative: %d", height)
-	}
+	testutil.True(t, width >= 0)
+	testutil.True(t, height >= 0)
 }

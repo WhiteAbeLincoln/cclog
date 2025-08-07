@@ -2,6 +2,8 @@ package filepicker
 
 import (
 	"testing"
+
+	"github.com/annenpolka/cclog/internal/testutil"
 )
 
 func TestCalculatePreviewHeight(t *testing.T) {
@@ -59,13 +61,8 @@ func TestCalculatePreviewHeight(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			height, listHeight := calculatePreviewHeight(tt.terminalHeight, tt.splitRatio, tt.minHeight)
 
-			if height != tt.expectedHeight {
-				t.Errorf("calculatePreviewHeight() preview height = %d, expected %d", height, tt.expectedHeight)
-			}
-
-			if listHeight != tt.expectedListHeight {
-				t.Errorf("calculatePreviewHeight() list height = %d, expected %d", listHeight, tt.expectedListHeight)
-			}
+			testutil.Diff(t, tt.expectedHeight, height)
+			testutil.Diff(t, tt.expectedListHeight, listHeight)
 		})
 	}
 }
@@ -115,9 +112,8 @@ func TestCalculateOptimalSplitRatio(t *testing.T) {
 
 			// Use tolerance for floating point comparison
 			tolerance := 0.001
-			if ratio < tt.expected-tolerance || ratio > tt.expected+tolerance {
-				t.Errorf("calculateOptimalSplitRatio() = %f, expected %f", ratio, tt.expected)
-			}
+			inRange := !(ratio < tt.expected-tolerance || ratio > tt.expected+tolerance)
+			testutil.True(t, inRange)
 		})
 	}
 }
@@ -129,45 +125,34 @@ func TestPreviewModelDynamicHeight(t *testing.T) {
 	preview.SetDynamicHeight(40, 0.6, 10)
 
 	_, height := preview.GetSize()
-	if height != 20 { // (40 - 6) * 0.6 = 20.4 -> 20
-		t.Errorf("SetDynamicHeight() height = %d, expected %d", height, 20)
-	}
+	testutil.Diff(t, 20, height) // (40 - 6) * 0.6 = 20.4 -> 20
 
 	// Test minimum height constraint on very small screen
 	preview.SetDynamicHeight(15, 0.5, 10)
 
 	_, height = preview.GetSize()
-	if height != 7 { // Adaptive split gives more to list on small screens
-		t.Errorf("SetDynamicHeight() with minimum constraint height = %d, expected %d", height, 7)
-	}
+	testutil.Diff(t, 7, height) // Adaptive split gives more to list on small screens
 }
 
 func TestPreviewModelSplitRatioAdjustment(t *testing.T) {
 	preview := NewPreviewModel()
 
 	// Test initial split ratio (now 80%)
-	if preview.GetSplitRatio() != 0.8 {
-		t.Errorf("Initial split ratio = %f, expected %f", preview.GetSplitRatio(), 0.8)
-	}
+	testutil.Diff(t, 0.8, preview.GetSplitRatio())
 
 	// Test adjusting split ratio (already at max)
 	preview.AdjustSplitRatio(0.1)
-	if preview.GetSplitRatio() != 0.8 {
-		t.Errorf("After adjustment split ratio = %f, expected %f", preview.GetSplitRatio(), 0.8)
-	}
+	testutil.Diff(t, 0.8, preview.GetSplitRatio())
 
 	// Test decreasing split ratio
 	preview.AdjustSplitRatio(-0.1)
 	tolerance := 0.001
 	expected := 0.7
 	actual := preview.GetSplitRatio()
-	if actual < expected-tolerance || actual > expected+tolerance {
-		t.Errorf("After decrease split ratio = %f, expected %f", actual, expected)
-	}
+	inRange := !(actual < expected-tolerance || actual > expected+tolerance)
+	testutil.True(t, inRange)
 
 	// Test minimum constraint
 	preview.AdjustSplitRatio(-1.0)
-	if preview.GetSplitRatio() != 0.2 { // Should be capped at 0.2
-		t.Errorf("Minimum constraint split ratio = %f, expected %f", preview.GetSplitRatio(), 0.2)
-	}
+	testutil.Diff(t, 0.2, preview.GetSplitRatio()) // Should be capped at 0.2
 }

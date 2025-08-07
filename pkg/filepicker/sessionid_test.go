@@ -2,6 +2,8 @@ package filepicker
 
 import (
 	"testing"
+
+	"github.com/annenpolka/cclog/internal/testutil"
 )
 
 func TestExtractSessionID(t *testing.T) {
@@ -91,20 +93,12 @@ func TestExtractSessionID(t *testing.T) {
 			result, err := extractSessionID(tt.filePath)
 
 			if tt.wantErr {
-				if err == nil {
-					t.Errorf("extractSessionID() expected error, got nil")
-				}
+				testutil.True(t, err != nil)
 				return
 			}
 
-			if err != nil {
-				t.Errorf("extractSessionID() unexpected error: %v", err)
-				return
-			}
-
-			if result != tt.expected {
-				t.Errorf("extractSessionID() = %v, want %v", result, tt.expected)
-			}
+			testutil.Diff(t, false, err != nil)
+			testutil.Diff(t, tt.expected, result)
 		})
 	}
 }
@@ -145,12 +139,8 @@ func TestExtractSessionIDEdgeCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := extractSessionID(tt.filePath)
-
-			if tt.wantErr && err == nil {
-				t.Errorf("Expected error but got none. %s", tt.description)
-			} else if !tt.wantErr && err != nil {
-				t.Errorf("Unexpected error: %v. %s", err, tt.description)
-			}
+			hasErr := err != nil
+			testutil.Diff(t, tt.wantErr, hasErr)
 		})
 	}
 }

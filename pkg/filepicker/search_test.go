@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/annenpolka/cclog/internal/domain"
+	"github.com/annenpolka/cclog/internal/testutil"
 )
 
 // Red: SearchInConversation should match text inside Message.content
@@ -20,9 +21,7 @@ func TestSearchInConversation_MatchesTextContent(t *testing.T) {
 		},
 	}
 
-	if ok := SearchInConversation("hello", msgs); !ok {
-		t.Fatalf("expected query to match user message content")
-	}
+	testutil.True(t, SearchInConversation("hello", msgs))
 }
 
 // Red: SearchInConversation should match text inside array-based content blocks
@@ -41,9 +40,7 @@ func TestSearchInConversation_MatchesArrayContent(t *testing.T) {
 		},
 	}
 
-	if ok := SearchInConversation("second", msgs); !ok {
-		t.Fatalf("expected query to match text inside array-based content")
-	}
+	testutil.True(t, SearchInConversation("second", msgs))
 }
 
 // Red: Should not match metadata like UUID; only message content
@@ -60,7 +57,5 @@ func TestSearchInConversation_DoesNotMatchMetadata(t *testing.T) {
 		},
 	}
 
-	if ok := SearchInConversation("magic-uuid", msgs); ok {
-		t.Fatalf("did not expect query to match metadata fields like UUID")
-	}
+	testutil.False(t, SearchInConversation("magic-uuid", msgs))
 }

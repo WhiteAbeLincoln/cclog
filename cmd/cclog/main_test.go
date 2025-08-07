@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/annenpolka/cclog/internal/testutil"
 )
 
 func TestDirectorySelectionHandling(t *testing.T) {
@@ -13,9 +15,7 @@ func TestDirectorySelectionHandling(t *testing.T) {
 	// Test with directory selection
 	if stat, err := os.Stat(tempDir); err == nil && stat.IsDir() {
 		// This should be true for directory
-		if !stat.IsDir() {
-			t.Error("Expected directory to be identified as directory")
-		}
+		testutil.True(t, stat.IsDir())
 	} else {
 		t.Fatalf("Failed to stat test directory: %v", err)
 	}
@@ -34,9 +34,7 @@ func TestFileSelectionHandling(t *testing.T) {
 	// Test with file selection
 	if stat, err := os.Stat(tempFile); err == nil {
 		// This should be false for file
-		if stat.IsDir() {
-			t.Error("Expected file to not be identified as directory")
-		}
+		testutil.False(t, stat.IsDir())
 	} else {
 		t.Fatalf("Failed to stat test file: %v", err)
 	}
@@ -48,9 +46,7 @@ func TestShouldSetDirectoryFlag(t *testing.T) {
 
 	// Test function
 	isDir := shouldSetDirectoryFlag(tempDir)
-	if !isDir {
-		t.Errorf("Expected shouldSetDirectoryFlag to return true for directory")
-	}
+	testutil.True(t, isDir)
 
 	// Create test file
 	tempFile := filepath.Join(tempDir, "test.txt")
@@ -61,15 +57,11 @@ func TestShouldSetDirectoryFlag(t *testing.T) {
 
 	// Test function with file
 	isDir = shouldSetDirectoryFlag(tempFile)
-	if isDir {
-		t.Errorf("Expected shouldSetDirectoryFlag to return false for file")
-	}
+	testutil.False(t, isDir)
 }
 
 func TestShouldSetDirectoryFlag_NonExistent(t *testing.T) {
 	// Test with non-existent path
 	isDir := shouldSetDirectoryFlag("/nonexistent/path")
-	if isDir {
-		t.Errorf("Expected shouldSetDirectoryFlag to return false for non-existent path")
-	}
+	testutil.False(t, isDir)
 }

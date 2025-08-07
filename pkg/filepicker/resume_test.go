@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/annenpolka/cclog/internal/testutil"
 )
 
 func TestResumeCommand(t *testing.T) {
@@ -77,29 +79,12 @@ func TestResumeCommand(t *testing.T) {
 			cmdName, args, err := generateResumeCommand(tt.filePath, tt.dangerous)
 
 			if tt.expectedErr {
-				if err == nil {
-					t.Errorf("Expected error but got none. %s", tt.description)
-				}
+				testutil.True(t, err != nil)
 				return
 			}
-
-			if err != nil {
-				t.Errorf("Unexpected error: %v. %s", err, tt.description)
-				return
-			}
-
-			if cmdName != tt.expectedCmdName {
-				t.Errorf("Expected command name %q, got %q. %s", tt.expectedCmdName, cmdName, tt.description)
-			}
-			if len(args) != len(tt.expectedArgs) {
-				t.Errorf("Expected %d arguments, got %d. %s", len(tt.expectedArgs), len(args), tt.description)
-			} else {
-				for i := range args {
-					if args[i] != tt.expectedArgs[i] {
-						t.Errorf("Expected argument %d to be %q, got %q. %s", i, tt.expectedArgs[i], args[i], tt.description)
-					}
-				}
-			}
+			testutil.Diff(t, false, err != nil)
+			testutil.Diff(t, tt.expectedCmdName, cmdName)
+			testutil.Diff(t, tt.expectedArgs, args)
 		})
 	}
 }
@@ -152,32 +137,13 @@ func TestResumeWithProjectDirectoryChange(t *testing.T) {
 			cmdName, args, dir, err := generateResumeCommandWithDirectoryChange(tt.filePath, tt.dangerous)
 
 			if tt.expectedErr {
-				if err == nil {
-					t.Errorf("Expected error but got none. %s", tt.description)
-				}
+				testutil.True(t, err != nil)
 				return
 			}
-
-			if err != nil {
-				t.Errorf("Unexpected error: %v. %s", err, tt.description)
-				return
-			}
-
-			if cmdName != tt.expectedCmdName {
-				t.Errorf("Expected command name %q, got %q. %s", tt.expectedCmdName, cmdName, tt.description)
-			}
-			if len(args) != len(tt.expectedArgs) {
-				t.Errorf("Expected %d arguments, got %d. %s", len(tt.expectedArgs), len(args), tt.description)
-			} else {
-				for i := range args {
-					if args[i] != tt.expectedArgs[i] {
-						t.Errorf("Expected argument %d to be %q, got %q. %s", i, tt.expectedArgs[i], args[i], tt.description)
-					}
-				}
-			}
-			if dir != tt.expectedDir {
-				t.Errorf("Expected directory %q, got %q. %s", tt.expectedDir, dir, tt.description)
-			}
+			testutil.Diff(t, false, err != nil)
+			testutil.Diff(t, tt.expectedCmdName, cmdName)
+			testutil.Diff(t, tt.expectedArgs, args)
+			testutil.Diff(t, tt.expectedDir, dir)
 		})
 	}
 }
@@ -354,29 +320,12 @@ func TestResumeKeyHandler(t *testing.T) {
 			cmdName, args, err := generateResumeCommand(tt.filePath, dangerous)
 
 			if tt.expectedErr {
-				if err == nil {
-					t.Errorf("Expected error but got none. %s", tt.description)
-				}
+				testutil.True(t, err != nil)
 				return
 			}
-
-			if err != nil {
-				t.Errorf("Unexpected error: %v. %s", err, tt.description)
-				return
-			}
-
-			if cmdName != tt.expectedCmdName {
-				t.Errorf("Expected command name %q, got %q. %s", tt.expectedCmdName, cmdName, tt.description)
-			}
-			if len(args) != len(tt.expectedArgs) {
-				t.Errorf("Expected %d arguments, got %d. %s", len(tt.expectedArgs), len(args), tt.description)
-			} else {
-				for i := range args {
-					if args[i] != tt.expectedArgs[i] {
-						t.Errorf("Expected argument %d to be %q, got %q. %s", i, tt.expectedArgs[i], args[i], tt.description)
-					}
-				}
-			}
+			testutil.Diff(t, false, err != nil)
+			testutil.Diff(t, tt.expectedCmdName, cmdName)
+			testutil.Diff(t, tt.expectedArgs, args)
 		})
 	}
 }

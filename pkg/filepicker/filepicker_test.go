@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/annenpolka/cclog/internal/domain"
+	"github.com/annenpolka/cclog/internal/testutil"
 )
 
 func TestFileInfo_FilterValue(t *testing.T) {
@@ -19,9 +20,7 @@ func TestFileInfo_FilterValue(t *testing.T) {
 		ModTime: time.Now(),
 	}
 	expected := "test.txt"
-	if got := file.FilterValue(); got != expected {
-		t.Errorf("FilterValue() = %v, want %v", got, expected)
-	}
+	testutil.Diff(t, expected, file.FilterValue())
 }
 
 func TestFileInfo_Title(t *testing.T) {
@@ -52,9 +51,7 @@ func TestFileInfo_Title(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.file.Title(); got != tt.expected {
-				t.Errorf("Title() = %v, want %v", got, tt.expected)
-			}
+			testutil.Diff(t, tt.expected, tt.file.Title())
 		})
 	}
 }
@@ -90,9 +87,7 @@ func TestFileInfo_Description(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.file.Description(); got != tt.expected {
-				t.Errorf("Description() = %v, want %v", got, tt.expected)
-			}
+			testutil.Diff(t, tt.expected, tt.file.Description())
 		})
 	}
 }
@@ -124,9 +119,7 @@ func TestGetFiles(t *testing.T) {
 
 	// Should have 2 actual files plus possibly ".." entry
 	expectedMinFiles := 2
-	if len(files) < expectedMinFiles {
-		t.Errorf("Expected at least %d files, got %d", expectedMinFiles, len(files))
-	}
+	testutil.Diff(t, true, len(files) >= expectedMinFiles)
 
 	// Check if both file and directory are present
 	found := make(map[string]bool)
@@ -134,19 +127,13 @@ func TestGetFiles(t *testing.T) {
 		found[file.Name] = true
 	}
 
-	if !found["test.txt"] {
-		t.Error("test.txt not found")
-	}
-	if !found["testdir"] {
-		t.Error("testdir not found")
-	}
+	testutil.True(t, found["test.txt"])
+	testutil.True(t, found["testdir"])
 }
 
 func TestGetFiles_NonExistentDirectory(t *testing.T) {
 	_, err := GetFiles("/nonexistent/directory")
-	if err == nil {
-		t.Error("Expected error for non-existent directory, got nil")
-	}
+	testutil.Diff(t, true, err != nil)
 }
 
 func TestGetFiles_IncludesParentDirectory(t *testing.T) {
@@ -169,19 +156,13 @@ func TestGetFiles_IncludesParentDirectory(t *testing.T) {
 	for _, file := range files {
 		if file.Name == ".." {
 			foundParent = true
-			if !file.IsDir {
-				t.Error("'..' should be marked as directory")
-			}
-			if file.Path != tempDir {
-				t.Errorf("Expected '..' path to be '%s', got '%s'", tempDir, file.Path)
-			}
+			testutil.True(t, file.IsDir)
+			testutil.Diff(t, tempDir, file.Path)
 			break
 		}
 	}
 
-	if !foundParent {
-		t.Error("Expected '..' entry for parent directory")
-	}
+	testutil.True(t, foundParent)
 }
 
 func TestGetFiles_NoParentForRoot(t *testing.T) {
@@ -196,9 +177,7 @@ func TestGetFiles_NoParentForRoot(t *testing.T) {
 	for _, file := range files {
 		if file.Name == ".." {
 			// This is okay for subdirectories, just ensure it's properly marked
-			if !file.IsDir {
-				t.Error("'..' should be marked as directory")
-			}
+			testutil.True(t, file.IsDir)
 		}
 	}
 }

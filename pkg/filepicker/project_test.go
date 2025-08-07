@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/annenpolka/cclog/internal/testutil"
 )
 
 func TestExtractProjectName(t *testing.T) {
@@ -57,9 +59,7 @@ func TestExtractProjectName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := extractProjectName(tt.cwd)
-			if result != tt.expected {
-				t.Errorf("extractProjectName(%q) = %q, want %q", tt.cwd, result, tt.expected)
-			}
+			testutil.Diff(t, tt.expected, result)
 		})
 	}
 }
@@ -132,9 +132,7 @@ func TestFileInfo_WithProjectName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.file.Title(); got != tt.expected {
-				t.Errorf("Title() = %v, want %v", got, tt.expected)
-			}
+			testutil.Diff(t, tt.expected, tt.file.Title())
 		})
 	}
 }
@@ -192,14 +190,8 @@ func TestExtractConversationInfo(t *testing.T) {
 
 			// Test extractConversationInfo
 			title, projectName := extractConversationInfo(tempFile.Name())
-
-			if title != tt.expectedTitle {
-				t.Errorf("Expected title %q, got %q", tt.expectedTitle, title)
-			}
-
-			if projectName != tt.expectedProject {
-				t.Errorf("Expected project name %q, got %q", tt.expectedProject, projectName)
-			}
+			testutil.Diff(t, tt.expectedTitle, title)
+			testutil.Diff(t, tt.expectedProject, projectName)
 		})
 	}
 }
@@ -260,14 +252,8 @@ func TestExtractConversationInfo_WithSummaryFirst(t *testing.T) {
 
 			// Test extractConversationInfo
 			title, projectName := extractConversationInfo(tempFile.Name())
-
-			if title != tt.expectedTitle {
-				t.Errorf("Expected title %q, got %q", tt.expectedTitle, title)
-			}
-
-			if projectName != tt.expectedProject {
-				t.Errorf("Expected project name %q, got %q", tt.expectedProject, projectName)
-			}
+			testutil.Diff(t, tt.expectedTitle, title)
+			testutil.Diff(t, tt.expectedProject, projectName)
 		})
 	}
 }
