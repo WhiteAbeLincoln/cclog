@@ -7,6 +7,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.5
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/charmbracelet/x/exp/teatest v0.0.0-20250702191427-5bdfc8f2e4ff
+	github.com/google/go-cmp v0.6.0
 	github.com/philistino/teacup v0.0.0-20230407173306-0aed529e2eaa
 	golang.org/x/term v0.32.0
 )
