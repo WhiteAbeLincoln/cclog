@@ -275,6 +275,53 @@ func TestRunCommandWithDirectory(t *testing.T) {
 	}
 }
 
+func TestRunCommand_ShowTitle_Single(t *testing.T) {
+    tempDir := t.TempDir()
+    testFile := filepath.Join(tempDir, "titled.jsonl")
+
+    // First user message content should become title
+    testContent := `{"type":"user","message":{"role":"user","content":"hello world"},"timestamp":"2025-07-06T05:01:29.618Z","uuid":"u1"}`
+    if err := os.WriteFile(testFile, []byte(testContent), 0644); err != nil {
+        t.Fatalf("Failed to create test file: %v", err)
+    }
+
+    cfg := Config{InputPath: testFile, ShowTitle: true}
+    out, err := RunCommand(cfg)
+    if err != nil {
+        t.Fatalf("RunCommand failed: %v", err)
+    }
+
+    if !strings.HasPrefix(out, "# hello world\n\n") {
+        t.Fatalf("expected markdown to start with title, got: %q", out[:min(40, len(out))])
+    }
+}
+
+func TestRunCommand_ShowTitle_Directory(t *testing.T) {
+    tempDir := t.TempDir()
+    f1 := filepath.Join(tempDir, "a.jsonl")
+    f2 := filepath.Join(tempDir, "b.jsonl")
+
+    // Directory: title taken from first log after filtering; use f1
+    c1 := `{"type":"user","message":{"role":"user","content":"dir-title"},"timestamp":"2025-07-06T05:01:29.618Z","uuid":"u1"}`
+    c2 := `{"type":"user","message":{"role":"user","content":"other"},"timestamp":"2025-07-06T05:01:30.618Z","uuid":"u2"}`
+
+    if err := os.WriteFile(f1, []byte(c1), 0644); err != nil { t.Fatal(err) }
+    if err := os.WriteFile(f2, []byte(c2), 0644); err != nil { t.Fatal(err) }
+
+    cfg := Config{InputPath: tempDir, IsDirectory: true, ShowTitle: true}
+    out, err := RunCommand(cfg)
+    if err != nil {
+        t.Fatalf("RunCommand failed: %v", err)
+    }
+
+    if !strings.HasPrefix(out, "# dir-title\n\n") {
+        t.Fatalf("expected directory markdown to start with title, got: %q", out[:min(40, len(out))])
+    }
+}
+
+// helper: safe substring length for error messages
+func min(a, b int) int { if a < b { return a }; return b }
+
 func TestGetDefaultTUIDirectory(t *testing.T) {
 	defaultDir := getDefaultTUIDirectory()
 

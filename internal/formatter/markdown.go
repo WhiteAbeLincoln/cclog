@@ -15,12 +15,28 @@ type FormatOptions struct {
 	ShowPlaceholders bool
 }
 
-// FormatConversationToMarkdown converts a single conversation log to markdown with optional FormatOptions
-func FormatConversationToMarkdown(log *domain.ConversationLog, options ...FormatOptions) string {
+// resolveOptions applies defaults when options are omitted
+func resolveOptions(options ...FormatOptions) FormatOptions {
 	opt := FormatOptions{ShowUUID: false}
 	if len(options) > 0 {
 		opt = options[0]
 	}
+	return opt
+}
+
+// sortedMessages returns a new slice of messages sorted by timestamp asc
+func sortedMessages(msgs []domain.Message) []domain.Message {
+	messages := make([]domain.Message, len(msgs))
+	copy(messages, msgs)
+	sort.Slice(messages, func(i, j int) bool {
+		return messages[i].Timestamp.Before(messages[j].Timestamp)
+	})
+	return messages
+}
+
+// FormatConversationToMarkdown converts a single conversation log to markdown with optional FormatOptions
+func FormatConversationToMarkdown(log *domain.ConversationLog, options ...FormatOptions) string {
+	opt := resolveOptions(options...)
 	var sb strings.Builder
 
 	// Header
@@ -29,11 +45,7 @@ func FormatConversationToMarkdown(log *domain.ConversationLog, options ...Format
 	sb.WriteString(fmt.Sprintf("**Messages:** %d\n\n", len(log.Messages)))
 
 	// Sort messages by timestamp for chronological order
-	messages := make([]domain.Message, len(log.Messages))
-	copy(messages, log.Messages)
-	sort.Slice(messages, func(i, j int) bool {
-		return messages[i].Timestamp.Before(messages[j].Timestamp)
-	})
+	messages := sortedMessages(log.Messages)
 
 	// Process messages
 	for _, msg := range messages {
@@ -50,10 +62,7 @@ func FormatConversationToMarkdown(log *domain.ConversationLog, options ...Format
 
 // FormatMultipleConversationsToMarkdown converts multiple conversation logs to markdown with optional FormatOptions
 func FormatMultipleConversationsToMarkdown(logs []*domain.ConversationLog, options ...FormatOptions) string {
-	opt := FormatOptions{ShowUUID: false}
-	if len(options) > 0 {
-		opt = options[0]
-	}
+	opt := resolveOptions(options...)
 	var sb strings.Builder
 
 	// Main header
@@ -64,8 +73,7 @@ func FormatMultipleConversationsToMarkdown(logs []*domain.ConversationLog, optio
 	sb.WriteString("## Table of Contents\n\n")
 	for i, log := range logs {
 		filename := filepath.Base(log.FilePath)
-		sb.WriteString(fmt.Sprintf("%d. [%s](#%s)\n", i+1, filename,
-			strings.ToLower(strings.ReplaceAll(filename, ".", ""))))
+		sb.WriteString(fmt.Sprintf("%d. [%s](#%s)\n", i+1, filename, makeAnchorFromFilename(filename)))
 	}
 	sb.WriteString("\n")
 
@@ -75,11 +83,7 @@ func FormatMultipleConversationsToMarkdown(logs []*domain.ConversationLog, optio
 		sb.WriteString(fmt.Sprintf("## %s\n\n", filename))
 
 		// Sort messages by timestamp
-		messages := make([]domain.Message, len(log.Messages))
-		copy(messages, log.Messages)
-		sort.Slice(messages, func(i, j int) bool {
-			return messages[i].Timestamp.Before(messages[j].Timestamp)
-		})
+		messages := sortedMessages(log.Messages)
 
 		for _, msg := range messages {
 			if msg.Type == "summary" {
@@ -93,6 +97,11 @@ func FormatMultipleConversationsToMarkdown(logs []*domain.ConversationLog, optio
 	}
 
 	return sb.String()
+}
+
+// makeAnchorFromFilename creates a simple markdown anchor from a filename
+func makeAnchorFromFilename(name string) string {
+	return strings.ToLower(strings.ReplaceAll(name, ".", ""))
 }
 
 // formatMessage formats a single message to markdown with optional FormatOptions

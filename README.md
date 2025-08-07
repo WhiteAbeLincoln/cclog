@@ -118,7 +118,7 @@ The project follows Go's standard project layout with clear separation of concer
 - **`internal/parser`**: Reads and parses `.jsonl` conversation log files.
 - **`internal/formatter`**: Handles message filtering and conversion to Markdown.
 - **`pkg/filepicker`**: Implements the interactive TUI, including file listing, preview, and keybindings.
-- **`pkg/types`**: Defines the core data structures for messages and conversations.
+- **`internal/domain`**: Defines the core data structures for messages and conversations.
 
 ## Development
 

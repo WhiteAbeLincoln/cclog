@@ -170,19 +170,8 @@ func extractConversationInfo(filePath string) (string, string) {
 		}
 	}
 
-	// Apply filtering to check if any meaningful messages remain after filtering
-	filteredLog := &domain.ConversationLog{
-		Messages: make([]domain.Message, 0),
-		FilePath: log.FilePath,
-	}
-
-	// Manually filter messages using the same logic as formatter.FilterConversationLog
-	for _, msg := range log.Messages {
-		// Apply the same filtering logic as IsContentfulMessage
-		if formatter.IsContentfulMessage(msg) {
-			filteredLog.Messages = append(filteredLog.Messages, msg)
-		}
-	}
+	// Apply filtering using shared formatter API
+	filteredLog := formatter.FilterConversationLog(log, true)
 
 	// Skip files with no meaningful messages after filtering
 	if len(filteredLog.Messages) == 0 {
@@ -200,37 +189,7 @@ func extractConversationTitle(filePath string) string {
 	return title
 }
 
-// extractMessageContent extracts string content from message
-func extractMessageContent(message any) string {
-	// Handle different message content types
-	switch v := message.(type) {
-	case map[string]any:
-		if content, ok := v["content"]; ok {
-			switch contentVal := content.(type) {
-			case string:
-				return contentVal
-			case []any:
-				// Handle array-based content (Claude's complex message format)
-				var result strings.Builder
-				for _, item := range contentVal {
-					if itemMap, ok := item.(map[string]any); ok {
-						if text, ok := itemMap["text"].(string); ok {
-							result.WriteString(text)
-						} else if itemType, ok := itemMap["type"].(string); ok && itemType == "text" {
-							if text, ok := itemMap["text"].(string); ok {
-								result.WriteString(text)
-							}
-						}
-					}
-				}
-				return result.String()
-			}
-		}
-	case string:
-		return v
-	}
-	return ""
-}
+// (removed) extractMessageContent: prefer formatter.ExtractMessageContent
 
 // GetFilesRecursive recursively collects all .jsonl files from a directory and its subdirectories
 func GetFilesRecursive(rootDir string) ([]FileInfo, error) {
@@ -317,7 +276,8 @@ func SearchInConversation(query string, messages []domain.Message) bool {
 	lowerQuery := strings.ToLower(query)
 
 	for _, msg := range messages {
-		content := formatter.ExtractMessageContent(&msg)
+		// Only search within the textual message content, not metadata
+		content := formatter.ExtractMessageContent(msg.Message)
 		if strings.Contains(strings.ToLower(content), lowerQuery) {
 			return true
 		}

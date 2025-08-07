@@ -17,7 +17,7 @@ make build          # Alternative build command
 go test ./...                    # Run all tests
 go test -cover ./...             # Run tests with coverage
 go test -v ./...                 # Run tests with verbose output
-go test ./pkg/types/             # Run tests for specific package
+go test ./internal/domain/       # Run tests for specific package
 make test                        # Run all tests (via Makefile)
 make test-coverage               # Run tests with coverage
 
@@ -42,7 +42,7 @@ The codebase follows Go's standard project layout with layered architecture and 
 
 ### Core Data Flow
 1. **JSONL Parsing** (`internal/parser`) - Reads and parses conversation log files
-2. **Type System** (`pkg/types`) - Defines message structures and conversation logs
+2. **Type System** (`internal/domain`) - Defines message structures and conversation logs
 3. **Message Filtering** (`internal/formatter/filter`) - Filters out noise and system messages
 4. **Markdown Formatting** (`internal/formatter/markdown`) - Converts parsed data to readable Markdown
 5. **CLI Interface** (`cmd/cclog` and `internal/cli`) - Provides command-line interface and TUI orchestration

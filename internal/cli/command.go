@@ -154,20 +154,11 @@ func RunCommand(config Config) (string, error) {
 			return "", fmt.Errorf("failed to parse directory: %w", err)
 		}
 
-		// Apply filtering to all logs
+		// Apply filtering to all logs via shared API
+		enableFiltering := !config.IncludeAll
 		filteredLogs := make([]*domain.ConversationLog, len(logs))
 		for i, log := range logs {
-			// NOTE: Keep as domain throughout
-			dFiltered := &domain.ConversationLog{
-				FilePath: log.FilePath,
-				Messages: make([]domain.Message, 0, len(log.Messages)),
-			}
-			for _, m := range log.Messages {
-				if formatter.IsContentfulMessage(m) || config.IncludeAll {
-					dFiltered.Messages = append(dFiltered.Messages, m)
-				}
-			}
-			filteredLogs[i] = dFiltered
+			filteredLogs[i] = formatter.FilterConversationLog(log, enableFiltering)
 		}
 
 		markdown = formatter.FormatMultipleConversationsToMarkdown(filteredLogs, formatter.FormatOptions{
@@ -176,10 +167,7 @@ func RunCommand(config Config) (string, error) {
 		})
 
 		// Add title if requested
-		if config.ShowTitle && len(filteredLogs) > 0 {
-			title := domain.ExtractTitle(filteredLogs[0])
-			markdown = fmt.Sprintf("# %s\n\n%s", title, markdown)
-		}
+		markdown = applyOptionalTitle(config.ShowTitle, filteredLogs, markdown)
 	} else {
 		// Parse single file
 		log, err := parser.ParseJSONLFile(config.InputPath)
@@ -187,26 +175,16 @@ func RunCommand(config Config) (string, error) {
 			return "", fmt.Errorf("failed to parse file: %w", err)
 		}
 
-		// Apply filtering (stay in domain.*)
-		filteredLog := &domain.ConversationLog{
-			FilePath: log.FilePath,
-			Messages: make([]domain.Message, 0, len(log.Messages)),
-		}
-		for _, m := range log.Messages {
-			if formatter.IsContentfulMessage(m) || config.IncludeAll {
-				filteredLog.Messages = append(filteredLog.Messages, m)
-			}
-		}
+		// Apply filtering via shared API
+		enableFiltering := !config.IncludeAll
+		filteredLog := formatter.FilterConversationLog(log, enableFiltering)
 		markdown = formatter.FormatConversationToMarkdown(filteredLog, formatter.FormatOptions{
 			ShowUUID:         config.ShowUUID,
 			ShowPlaceholders: config.IncludeAll,
 		})
 
 		// Add title if requested
-		if config.ShowTitle {
-			title := domain.ExtractTitle(filteredLog)
-			markdown = fmt.Sprintf("# %s\n\n%s", title, markdown)
-		}
+		markdown = applyOptionalTitle(config.ShowTitle, []*domain.ConversationLog{filteredLog}, markdown)
 	}
 
 	// Write output if specified
@@ -225,6 +203,17 @@ func RunCommand(config Config) (string, error) {
 	}
 
 	return markdown, nil
+}
+
+// applyOptionalTitle prefixes the markdown with a top-level title when enabled.
+// For multiple logs, it uses the first conversation to extract the title,
+// matching the previous behavior.
+func applyOptionalTitle(show bool, logs []*domain.ConversationLog, markdown string) string {
+	if !show || len(logs) == 0 {
+		return markdown
+	}
+	title := domain.ExtractTitle(logs[0])
+	return fmt.Sprintf("# %s\n\n%s", title, markdown)
 }
 
 // GetHelpText returns the help text for the command
