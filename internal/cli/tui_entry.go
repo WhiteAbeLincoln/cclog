@@ -3,12 +3,19 @@ package cli
 import (
 	"fmt"
 
+	"github.com/annenpolka/cclog/internal/usecase"
 	"github.com/annenpolka/cclog/pkg/filepicker"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // RunTUI starts the TUI file picker and returns the selected file
 func RunTUI(config Config) (string, error) {
+	// Inject renderer so TUI uses the same pipeline as CLI/usecase
+	filepicker.SetRenderer(func(path string, includeAll bool) (string, error) {
+		opts := usecase.Options{IncludeAll: includeAll, ShowUUID: false, ShowTitle: false}
+		return usecase.GenerateMarkdownFromPath(path, opts)
+	})
+
 	// Create and run the TUI model
 	model := filepicker.NewModel(config.InputPath, config.Recursive)
 	program := tea.NewProgram(model)

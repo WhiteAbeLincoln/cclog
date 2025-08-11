@@ -1,14 +1,12 @@
 package cli
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
+    "fmt"
+    "os"
+    "path/filepath"
+    "strings"
 
-	"github.com/annenpolka/cclog/internal/domain"
-	"github.com/annenpolka/cclog/internal/formatter"
-	"github.com/annenpolka/cclog/internal/parser"
+    "github.com/annenpolka/cclog/internal/usecase"
 )
 
 // Config represents command-line configuration
@@ -145,46 +143,24 @@ func RunCommand(config Config) (string, error) {
 		return "", fmt.Errorf("input path does not exist: %s", config.InputPath)
 	}
 
-	var markdown string
+	opts := usecase.Options{
+		IncludeAll: config.IncludeAll,
+		ShowUUID:   config.ShowUUID,
+		ShowTitle:  config.ShowTitle,
+	}
 
+	var markdown string
+	var err error
 	if config.IsDirectory {
-		// Parse directory
-		logs, err := parser.ParseJSONLDirectory(config.InputPath)
+		markdown, err = usecase.GenerateMarkdownFromDirectory(config.InputPath, opts)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse directory: %w", err)
 		}
-
-		// Apply filtering to all logs via shared API
-		enableFiltering := !config.IncludeAll
-		filteredLogs := make([]*domain.ConversationLog, len(logs))
-		for i, log := range logs {
-			filteredLogs[i] = formatter.FilterConversationLog(log, enableFiltering)
-		}
-
-		markdown = formatter.FormatMultipleConversationsToMarkdown(filteredLogs, formatter.FormatOptions{
-			ShowUUID:         config.ShowUUID,
-			ShowPlaceholders: config.IncludeAll,
-		})
-
-		// Add title if requested
-		markdown = applyOptionalTitle(config.ShowTitle, filteredLogs, markdown)
 	} else {
-		// Parse single file
-		log, err := parser.ParseJSONLFile(config.InputPath)
+		markdown, err = usecase.GenerateMarkdownFromFile(config.InputPath, opts)
 		if err != nil {
 			return "", fmt.Errorf("failed to parse file: %w", err)
 		}
-
-		// Apply filtering via shared API
-		enableFiltering := !config.IncludeAll
-		filteredLog := formatter.FilterConversationLog(log, enableFiltering)
-		markdown = formatter.FormatConversationToMarkdown(filteredLog, formatter.FormatOptions{
-			ShowUUID:         config.ShowUUID,
-			ShowPlaceholders: config.IncludeAll,
-		})
-
-		// Add title if requested
-		markdown = applyOptionalTitle(config.ShowTitle, []*domain.ConversationLog{filteredLog}, markdown)
 	}
 
 	// Write output if specified
@@ -208,13 +184,6 @@ func RunCommand(config Config) (string, error) {
 // applyOptionalTitle prefixes the markdown with a top-level title when enabled.
 // For multiple logs, it uses the first conversation to extract the title,
 // matching the previous behavior.
-func applyOptionalTitle(show bool, logs []*domain.ConversationLog, markdown string) string {
-	if !show || len(logs) == 0 {
-		return markdown
-	}
-	title := domain.ExtractTitle(logs[0])
-	return fmt.Sprintf("# %s\n\n%s", title, markdown)
-}
 
 // GetHelpText returns the help text for the command
 func GetHelpText() string {

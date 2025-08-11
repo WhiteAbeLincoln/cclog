@@ -51,3 +51,6 @@ coverage.html
 
 # Serena cache files
 .serena/cache/
+
+# Local Go build cache
+.gocache/

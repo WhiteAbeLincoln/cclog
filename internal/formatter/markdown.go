@@ -115,11 +115,16 @@ func formatMessage(msg domain.Message, options ...FormatOptions) string {
 	// Determine message type and format accordingly
 	switch msg.Type {
 	case "user":
-		sb.WriteString("### User\n\n")
+		sb.WriteString("## User\n\n")
 	case "assistant":
-		sb.WriteString("### Assistant\n\n")
+		sb.WriteString("## Assistant\n\n")
 	default:
-		sb.WriteString(fmt.Sprintf("### %s\n\n", strings.Title(msg.Type)))
+		// Fallback title casing: capitalize first letter
+		t := msg.Type
+		if t != "" {
+			t = strings.ToUpper(t[:1]) + t[1:]
+		}
+		sb.WriteString(fmt.Sprintf("## %s\n\n", t))
 	}
 
 	// Add timestamp using system timezone

@@ -656,16 +656,20 @@ func convertAndOpenInEditor(jsonlPath string, enableFiltering bool) tea.Cmd {
 
 // convertJSONLToMarkdown converts a JSONL file to markdown format
 func convertJSONLToMarkdown(jsonlPath string, enableFiltering bool) (string, error) {
-	// Parse JSONL file
+	// Prefer injected renderer if available
+	if renderFn != nil {
+		includeAll := !enableFiltering
+		return renderFn(jsonlPath, includeAll)
+	}
+
+	// Fallback to internal pipeline
 	log, err := parser.ParseJSONLFile(jsonlPath)
 	if err != nil {
 		return "", err
 	}
 
-	// Apply filtering based on enableFiltering parameter
 	filteredLog := formatter.FilterConversationLog(log, enableFiltering)
 
-	// Convert to markdown
 	markdown := formatter.FormatConversationToMarkdown(filteredLog, formatter.FormatOptions{
 		ShowUUID:         false,
 		ShowPlaceholders: !enableFiltering, // Show placeholders when filtering is disabled (--include-all equivalent)
