@@ -1,12 +1,12 @@
 package cli
 
 import (
-    "fmt"
-    "os"
-    "path/filepath"
-    "strings"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
-    "github.com/annenpolka/cclog/internal/usecase"
+	"github.com/annenpolka/cclog/internal/usecase"
 )
 
 // Config represents command-line configuration
@@ -26,17 +26,21 @@ type Config struct {
 func ParseArgs(args []string) (Config, error) {
 	config := Config{}
 	hasPathOption := false
+	hasProjOption := false
+	projPath := ""
 
-	// Check if --path option is used to determine default behavior
+	// Check if --path or --proj option is used to determine default behavior
 	for i := 1; i < len(args); i++ {
 		if args[i] == "--path" {
 			hasPathOption = true
-			break
+		}
+		if args[i] == "--proj" {
+			hasProjOption = true
 		}
 	}
 
-	// If no arguments provided or --path option is used, enable TUI mode and recursive mode by default
-	if len(args) < 2 || hasPathOption {
+	// If no arguments provided or --path/--proj option is used, enable TUI mode and recursive mode by default
+	if len(args) < 2 || hasPathOption || hasProjOption {
 		config.TUIMode = true
 		config.Recursive = true
 		// Continue to process default directory setup below
@@ -76,12 +80,29 @@ func ParseArgs(args []string) (Config, error) {
 				}
 				config.InputPath = args[i+1]
 				i++ // Skip next argument as it's the input path
+			case "--proj":
+				// Optional value: use next arg if it exists and doesn't look like a flag
+				if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+					projPath = args[i+1]
+					i++
+				} else {
+					projPath = "."
+				}
 			default:
 				if config.InputPath == "" {
 					config.InputPath = arg
 				}
 			}
 		}
+	}
+
+	// Resolve --proj to the corresponding ~/.claude/projects directory
+	if hasProjOption {
+		resolved, err := resolveProjectDirectory(projPath)
+		if err != nil {
+			return Config{}, fmt.Errorf("failed to resolve project directory: %w", err)
+		}
+		config.InputPath = resolved
 	}
 
 	if config.InputPath == "" && !config.ShowHelp && !config.TUIMode {
@@ -125,6 +146,44 @@ func getDefaultTUIDirectory() string {
 func ensureDefaultDirectoryExists(dir string) error {
 	_, err := os.Stat(dir)
 	return err
+}
+
+// projectDirName converts an absolute path to its Claude projects directory name.
+// e.g. "/Users/abe/Projects/cclog" → "-Users-abe-Projects-cclog"
+func projectDirName(absPath string) string {
+	return strings.ReplaceAll(absPath, string(filepath.Separator), "-")
+}
+
+// resolveProjectDirectory resolves a project path to the corresponding
+// ~/.claude/projects directory. It walks up parent directories to find
+// the closest ancestor that has a matching Claude projects directory.
+func resolveProjectDirectory(projPath string) (string, error) {
+	absPath, err := filepath.Abs(projPath)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve path %q: %w", projPath, err)
+	}
+
+	projectsBase := getDefaultTUIDirectory()
+
+	// Walk from the given path up to the root, checking each ancestor
+	candidate := absPath
+	for {
+		dirName := projectDirName(candidate)
+		claudeProjectDir := filepath.Join(projectsBase, dirName)
+		if _, err := os.Stat(claudeProjectDir); err == nil {
+			return claudeProjectDir, nil
+		}
+
+		parent := filepath.Dir(candidate)
+		if parent == candidate {
+			// Reached filesystem root without finding a match
+			break
+		}
+		candidate = parent
+	}
+
+	// No matching directory found - return an error with the most specific name tried
+	return "", fmt.Errorf("no Claude project directory found for %s (looked in %s)", absPath, projectsBase)
 }
 
 // RunCommand executes the main command logic
@@ -206,6 +265,8 @@ OPTIONS:
     --tui              Open interactive file picker (TUI mode)
     -r, --recursive    Recursively search for .jsonl files and open TUI mode
     --path PATH        Specify directory path for TUI mode
+    --proj [PATH]      Resolve project path to ~/.claude/projects directory
+                       (defaults to current directory if PATH omitted)
     -h, --help         Show this help message
 
 EXAMPLES:
@@ -229,5 +290,11 @@ EXAMPLES:
 
     # Open interactive file picker (explicit TUI mode)
     cclog --tui
+
+    # View logs for current project (resolves to ~/.claude/projects/...)
+    cclog --proj
+
+    # View logs for a specific project directory
+    cclog --proj /path/to/project
 `)
 }

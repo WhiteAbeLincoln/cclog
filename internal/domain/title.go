@@ -20,7 +20,7 @@ func ExtractTitle(log *ConversationLog) string {
 	for _, msg := range log.Messages {
 		if msg.Type == "summary" {
 			if title := extractTitleFromSummary(msg); title != "" {
-				return replaceNewlinesWithSpaces(title)
+				return ReplaceNewlinesWithSpaces(title)
 			}
 		}
 	}
@@ -29,7 +29,7 @@ func ExtractTitle(log *ConversationLog) string {
 	for _, msg := range log.Messages {
 		if msg.Type == "user" && !msg.IsMeta {
 			if title := extractTitleFromUserMessage(msg); title != "" {
-				return replaceNewlinesWithSpaces(title)
+				return ReplaceNewlinesWithSpaces(title)
 			}
 		}
 	}
@@ -37,8 +37,8 @@ func ExtractTitle(log *ConversationLog) string {
 	return "Claude Conversation"
 }
 
-// replaceNewlinesWithSpaces replaces all newline characters with spaces
-func replaceNewlinesWithSpaces(title string) string {
+// ReplaceNewlinesWithSpaces replaces all newline characters with spaces
+func ReplaceNewlinesWithSpaces(title string) string {
 	// Replace various newline combinations with spaces
 	title = strings.ReplaceAll(title, "\r\n", " ") // CRLF
 	title = strings.ReplaceAll(title, "\n", " ")   // LF

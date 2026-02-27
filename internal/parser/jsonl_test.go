@@ -164,6 +164,31 @@ func TestExtractSubagentInfo(t *testing.T) {
 	testutil.True(t, !info.Timestamp.IsZero())
 }
 
+func TestExtractSubagentInfo_NewlinesInTitle(t *testing.T) {
+	tmpDir := t.TempDir()
+	saDir := filepath.Join(tmpDir, "session-123", "subagents")
+	if err := os.MkdirAll(saDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a subagent file whose first user message contains newlines
+	saFile := filepath.Join(saDir, "agent-xyz.jsonl")
+	content := `{"type":"user","message":{"role":"user","content":"line one\nline two\r\nline three"},"timestamp":"2025-07-06T05:01:29.618Z","uuid":"u1"}`
+	if err := os.WriteFile(saFile, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := ExtractSubagentInfo(saFile)
+	if err != nil {
+		t.Fatalf("ExtractSubagentInfo failed: %v", err)
+	}
+
+	if strings.ContainsAny(info.Title, "\n\r") {
+		t.Errorf("title should not contain newlines, got: %q", info.Title)
+	}
+	testutil.Diff(t, "line one line two line three", info.Title)
+}
+
 func TestParseJSONLDirectoryWithEmptyFiles(t *testing.T) {
 	// Create a temporary directory with mixed files
 	tmpDir := t.TempDir()

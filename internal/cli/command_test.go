@@ -156,6 +156,21 @@ func TestParseArgs(t *testing.T) {
 			expected: Config{},
 			wantErr:  true,
 		},
+		{
+			name: "proj flag without value should enable TUI and recursive",
+			args: []string{"cclog", "--proj"},
+			expected: Config{
+				TUIMode:   true,
+				Recursive: true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "proj flag with non-existent project path should return error",
+			args:     []string{"cclog", "--proj", "/nonexistent/path"},
+			expected: Config{},
+			wantErr:  true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -364,4 +379,109 @@ func TestGetDefaultTUIDirectory_FallbackBehavior(t *testing.T) {
 	result = getDefaultTUIDirectory()
 	expected = filepath.Join(tempHome, ".config", "claude", "projects")
 	testutil.Diff(t, expected, result)
+}
+
+func TestProjectDirName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"/Users/abe/Projects/cclog", "-Users-abe-Projects-cclog"},
+		{"/Users/abe/a/b", "-Users-abe-a-b"},
+		{"/", "-"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			testutil.Diff(t, tt.expected, projectDirName(tt.input))
+		})
+	}
+}
+
+func TestResolveProjectDirectory(t *testing.T) {
+	// Set up a fake HOME with .claude/projects structure
+	tempHome := t.TempDir()
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", tempHome)
+	defer os.Setenv("HOME", originalHome)
+
+	projectsDir := filepath.Join(tempHome, ".claude", "projects")
+
+	// Create a project directory that simulates /a/b/c having been a Claude session
+	projectPath := filepath.Join(tempHome, "a", "b", "c")
+	if err := os.MkdirAll(projectPath, 0755); err != nil {
+		t.Fatal(err)
+	}
+	encodedName := projectDirName(filepath.Join(tempHome, "a", "b", "c"))
+	claudeProjDir := filepath.Join(projectsDir, encodedName)
+	if err := os.MkdirAll(claudeProjDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("exact match", func(t *testing.T) {
+		result, err := resolveProjectDirectory(filepath.Join(tempHome, "a", "b", "c"))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		testutil.Diff(t, claudeProjDir, result)
+	})
+
+	t.Run("subdirectory walks up to find parent", func(t *testing.T) {
+		// Create subdirectory d/e under the project
+		subDir := filepath.Join(tempHome, "a", "b", "c", "d", "e")
+		if err := os.MkdirAll(subDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		result, err := resolveProjectDirectory(subDir)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		testutil.Diff(t, claudeProjDir, result)
+	})
+
+	t.Run("no match returns error", func(t *testing.T) {
+		noMatchDir := filepath.Join(tempHome, "x", "y")
+		if err := os.MkdirAll(noMatchDir, 0755); err != nil {
+			t.Fatal(err)
+		}
+
+		_, err := resolveProjectDirectory(noMatchDir)
+		if err == nil {
+			t.Fatal("expected error for unmatched directory, got nil")
+		}
+		if !strings.Contains(err.Error(), "no Claude project directory found") {
+			t.Fatalf("unexpected error message: %v", err)
+		}
+	})
+}
+
+func TestParseArgs_ProjResolvesPath(t *testing.T) {
+	// Set up a fake HOME with .claude/projects structure
+	tempHome := t.TempDir()
+	originalHome := os.Getenv("HOME")
+	os.Setenv("HOME", tempHome)
+	defer os.Setenv("HOME", originalHome)
+
+	projectsDir := filepath.Join(tempHome, ".claude", "projects")
+
+	// Create a project directory matching CWD
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	encodedName := projectDirName(cwd)
+	claudeProjDir := filepath.Join(projectsDir, encodedName)
+	if err := os.MkdirAll(claudeProjDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// --proj without value should resolve "." to the Claude projects dir for CWD
+	config, err := ParseArgs([]string{"cclog", "--proj"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	testutil.Diff(t, claudeProjDir, config.InputPath)
+	testutil.True(t, config.TUIMode)
+	testutil.True(t, config.Recursive)
 }

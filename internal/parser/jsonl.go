@@ -154,7 +154,7 @@ func extractTitleFromMessage(message interface{}) string {
 		return ""
 	}
 	if str, ok := content.(string); ok {
-		return truncate(str, 80)
+		return truncate(domain.ReplaceNewlinesWithSpaces(str), 80)
 	}
 	return ""
 }
