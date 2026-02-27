@@ -3,10 +3,21 @@ package filepicker
 import (
 	"testing"
 
+	"github.com/atotto/clipboard"
+
 	"github.com/annenpolka/cclog/internal/testutil"
 )
 
+func skipWithoutClipboard(t *testing.T) {
+	t.Helper()
+	if err := clipboard.WriteAll("test"); err != nil {
+		t.Skip("clipboard not available in this environment")
+	}
+}
+
 func TestCopySessionID(t *testing.T) {
+	skipWithoutClipboard(t)
+
 	tests := []struct {
 		name     string
 		filePath string
@@ -45,9 +56,7 @@ func TestCopySessionID(t *testing.T) {
 }
 
 func TestCopySessionIDIntegration(t *testing.T) {
-	// This test verifies the integration with the actual clipboard library
-	// It should fail initially with the current golang.design/x/clipboard
-	// and pass after switching to atotto/clipboard
+	skipWithoutClipboard(t)
 
 	filePath := "../../testdata/sample.jsonl"
 

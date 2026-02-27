@@ -68,6 +68,11 @@ func TestFormatConversationToMarkdownWithUUID(t *testing.T) {
 }
 
 func TestFormatConversationToMarkdown(t *testing.T) {
+	// Pin local timezone to UTC so date assertions are stable
+	originalLocal := time.Local
+	time.Local = time.UTC
+	t.Cleanup(func() { time.Local = originalLocal })
+
 	// Create test data
 	timestamp1, _ := time.Parse(time.RFC3339, "2025-07-06T05:01:29.618Z")
 	timestamp2, _ := time.Parse(time.RFC3339, "2025-07-06T05:01:44.663Z")
