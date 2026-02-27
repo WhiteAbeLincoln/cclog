@@ -20,6 +20,8 @@ type FileInfo struct {
 	ModTime           time.Time
 	ConversationTitle string
 	ProjectName       string
+	Depth             int    // 0 = root conversation, 1 = subagent
+	ParentPath        string // path of parent conversation (empty for root)
 }
 
 func (f FileInfo) FilterValue() string {
@@ -34,6 +36,15 @@ func (f FileInfo) Title() string {
 	// For JSONL files, display "date [project] title" format
 	if filepath.Ext(f.Name) == ".jsonl" {
 		dateStr := f.ModTime.Format("2006-01-02 15:04")
+
+		// Subagent entries get a distinct prefix
+		if f.Depth > 0 {
+			title := f.ConversationTitle
+			if title == "" {
+				title = f.Name
+			}
+			return dateStr + " subagent: " + title
+		}
 
 		// Add project name if available
 		var projectPart string
@@ -138,6 +149,9 @@ func GetFiles(dir string) ([]FileInfo, error) {
 		return regularFiles[i].ModTime.After(regularFiles[j].ModTime)
 	})
 
+	// Insert subagent files after their parents
+	regularFiles = insertSubagentFiles(regularFiles)
+
 	// Rebuild files slice with parent directory first (if exists)
 	var sortedFiles []FileInfo
 	if parentDir != nil {
@@ -191,6 +205,61 @@ func extractConversationTitle(filePath string) string {
 
 // (removed) extractMessageContent: prefer formatter.ExtractMessageContent
 
+// discoverSubagentFiles finds subagent JSONL files for a parent conversation file
+// and returns FileInfo entries with Depth=1.
+func discoverSubagentFiles(parentPath string) []FileInfo {
+	saFiles, err := parser.FindSubagentFiles(parentPath)
+	if err != nil || len(saFiles) == 0 {
+		return nil
+	}
+
+	var result []FileInfo
+	for _, sf := range saFiles {
+		info, err := os.Stat(sf)
+		if err != nil {
+			continue
+		}
+
+		saInfo, err := parser.ExtractSubagentInfo(sf)
+		if err != nil {
+			continue
+		}
+
+		result = append(result, FileInfo{
+			Name:              filepath.Base(sf),
+			Path:              sf,
+			IsDir:             false,
+			Size:              info.Size(),
+			ModTime:           info.ModTime(),
+			ConversationTitle: saInfo.Title,
+			Depth:             1,
+			ParentPath:        parentPath,
+		})
+	}
+
+	// Sort subagent files by modification time (newest first)
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].ModTime.After(result[j].ModTime)
+	})
+
+	return result
+}
+
+// insertSubagentFiles takes a sorted file list and inserts subagent entries
+// immediately after their parent conversation files.
+func insertSubagentFiles(files []FileInfo) []FileInfo {
+	var result []FileInfo
+	for _, file := range files {
+		result = append(result, file)
+		// After each root-level JSONL file, insert its subagents
+		if !file.IsDir && file.Depth == 0 && filepath.Ext(file.Name) == ".jsonl" {
+			subagents := discoverSubagentFiles(file.Path)
+			result = append(result, subagents...)
+		}
+	}
+	return result
+}
+
 // GetFilesRecursive recursively collects all .jsonl files from a directory and its subdirectories
 func GetFilesRecursive(rootDir string) ([]FileInfo, error) {
 	var allFiles []FileInfo
@@ -198,6 +267,11 @@ func GetFilesRecursive(rootDir string) ([]FileInfo, error) {
 	err := filepath.WalkDir(rootDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+
+		// Skip subagent directories — they'll be discovered via insertSubagentFiles
+		if d.IsDir() && d.Name() == "subagents" {
+			return filepath.SkipDir
 		}
 
 		// Skip directories
@@ -245,6 +319,9 @@ func GetFilesRecursive(rootDir string) ([]FileInfo, error) {
 	sort.Slice(allFiles, func(i, j int) bool {
 		return allFiles[i].ModTime.After(allFiles[j].ModTime)
 	})
+
+	// Insert subagent files after their parents
+	allFiles = insertSubagentFiles(allFiles)
 
 	return allFiles, nil
 }

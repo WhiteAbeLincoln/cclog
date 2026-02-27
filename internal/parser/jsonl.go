@@ -74,3 +74,94 @@ func ParseJSONLDirectory(dirPath string) ([]*domain.ConversationLog, error) {
 
 	return logs, nil
 }
+
+// FindSubagentFiles returns paths to subagent JSONL files associated with a main conversation file.
+// For a file like "abc123.jsonl", it looks for "abc123/subagents/*.jsonl" in the same directory.
+func FindSubagentFiles(mainFilePath string) ([]string, error) {
+	dir := filepath.Dir(mainFilePath)
+	base := filepath.Base(mainFilePath)
+	sessionID := strings.TrimSuffix(base, ".jsonl")
+	if sessionID == base {
+		return nil, nil // not a .jsonl file
+	}
+
+	pattern := filepath.Join(dir, sessionID, "subagents", "*.jsonl")
+	files, err := filepath.Glob(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to glob subagent files: %w", err)
+	}
+	return files, nil
+}
+
+// ExtractSubagentInfo parses the first message of a subagent JSONL file
+// to extract metadata (agentId, timestamp, title from first user message content).
+func ExtractSubagentInfo(filePath string) (domain.SubagentInfo, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return domain.SubagentInfo{}, fmt.Errorf("failed to open subagent file %s: %w", filePath, err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	var firstMsg domain.Message
+	var title string
+	found := false
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var msg domain.Message
+		if err := json.Unmarshal([]byte(line), &msg); err != nil {
+			continue
+		}
+		if !found {
+			firstMsg = msg
+			found = true
+		}
+		// Extract title from the first user message content
+		if msg.Type == "user" && title == "" {
+			title = extractTitleFromMessage(msg.Message)
+		}
+		if found && title != "" {
+			break
+		}
+	}
+
+	if !found {
+		return domain.SubagentInfo{}, fmt.Errorf("no messages in subagent file %s", filePath)
+	}
+
+	return domain.SubagentInfo{
+		FilePath:  filePath,
+		AgentID:   firstMsg.AgentID,
+		Title:     title,
+		Timestamp: firstMsg.Timestamp,
+	}, nil
+}
+
+// extractTitleFromMessage extracts the first ~80 chars of text content from a message.
+func extractTitleFromMessage(message interface{}) string {
+	msgMap, ok := message.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	content, exists := msgMap["content"]
+	if !exists {
+		return ""
+	}
+	if str, ok := content.(string); ok {
+		return truncate(str, 80)
+	}
+	return ""
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}

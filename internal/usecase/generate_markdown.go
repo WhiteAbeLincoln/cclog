@@ -47,9 +47,21 @@ func GenerateMarkdownFromFile(filePath string, opts ...Options) (string, error) 
     }
     enableFiltering := !o.IncludeAll
     filtered := formatter.FilterConversationLog(log, enableFiltering)
+
+    // Discover subagent conversations
+    var subagents []domain.SubagentInfo
+    if saFiles, err := parser.FindSubagentFiles(filePath); err == nil {
+        for _, sf := range saFiles {
+            if info, err := parser.ExtractSubagentInfo(sf); err == nil {
+                subagents = append(subagents, info)
+            }
+        }
+    }
+
     md := formatter.FormatConversationToMarkdown(filtered, formatter.FormatOptions{
         ShowUUID:         o.ShowUUID,
         ShowPlaceholders: o.IncludeAll,
+        Subagents:        subagents,
     })
     if o.ShowTitle {
         title := domain.ExtractTitle(filtered)

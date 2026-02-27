@@ -382,16 +382,22 @@ func (m Model) View() string {
 	// Show files list with scrolling and colorful styling
 	for i := displayStart; i < displayEnd; i++ {
 		file := currentFiles[i]
-		cursor := " "
+		// Add indentation for subagent entries
+		indent := ""
+		if file.Depth > 0 {
+			indent = strings.Repeat("  ", file.Depth)
+		}
+
+		cursor := indent + " "
 		if i == m.cursor {
-			cursor = cursorStyle.Render(">")
+			cursor = indent + cursorStyle.Render(">")
 		}
 
 		// Get base title and apply responsive formatting
 		title := file.Title()
 
 		// Calculate available width for content
-		prefixWidth := 3 // cursor + spaces
+		prefixWidth := 3 + len(indent) // cursor + spaces + indent
 		availableWidth := m.terminalWidth - prefixWidth
 
 		// Truncate title first, then apply colorful styling

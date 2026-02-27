@@ -345,3 +345,113 @@ func TestExtractMessageContentWithPlaceholders(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatConversationWithSubagentLinks(t *testing.T) {
+	// Pin timezone for stable output
+	originalLocal := time.Local
+	time.Local = time.UTC
+	t.Cleanup(func() { time.Local = originalLocal })
+
+	ts1, _ := time.Parse(time.RFC3339, "2025-07-06T10:00:00.000Z")
+	ts2, _ := time.Parse(time.RFC3339, "2025-07-06T10:00:05.000Z")
+	ts3, _ := time.Parse(time.RFC3339, "2025-07-06T10:01:00.000Z")
+
+	log := &domain.ConversationLog{
+		FilePath: "/test/conversation.jsonl",
+		Messages: []domain.Message{
+			{
+				Type:      "user",
+				UUID:      "msg-1",
+				Timestamp: ts1,
+				Message: map[string]interface{}{
+					"role":    "user",
+					"content": "Add unit tests",
+				},
+			},
+			{
+				Type:      "assistant",
+				UUID:      "msg-2",
+				Timestamp: ts2,
+				Message: map[string]interface{}{
+					"role": "assistant",
+					"content": []interface{}{
+						map[string]interface{}{
+							"type": "text",
+							"text": "Let me explore first.",
+						},
+						map[string]interface{}{
+							"type": "tool_use",
+							"name": "Task",
+							"input": map[string]interface{}{
+								"description": "Explore project",
+							},
+						},
+					},
+				},
+			},
+			{
+				Type:      "assistant",
+				UUID:      "msg-3",
+				Timestamp: ts3,
+				Message: map[string]interface{}{
+					"role":    "assistant",
+					"content": "Now writing tests.",
+				},
+			},
+		},
+	}
+
+	subagents := []domain.SubagentInfo{
+		{
+			FilePath:  "/test/session/subagents/agent-abc.jsonl",
+			AgentID:   "abc",
+			Title:     "Find source files",
+			Timestamp: ts2.Add(3 * time.Millisecond), // 3ms after parent message
+		},
+	}
+
+	markdown := FormatConversationToMarkdown(log, FormatOptions{
+		Subagents: subagents,
+	})
+
+	// Subagent link should appear after the assistant message at ts2
+	testutil.True(t, strings.Contains(markdown, "- Subagent: [Find source files](/test/session/subagents/agent-abc.jsonl)"))
+
+	// The link should appear between the two assistant messages
+	exploreIdx := strings.Index(markdown, "Let me explore first.")
+	linkIdx := strings.Index(markdown, "Subagent: [Find source files]")
+	writingIdx := strings.Index(markdown, "Now writing tests.")
+
+	testutil.True(t, exploreIdx < linkIdx)
+	testutil.True(t, linkIdx < writingIdx)
+}
+
+func TestAssignSubagentsToMessages(t *testing.T) {
+	ts1, _ := time.Parse(time.RFC3339, "2025-07-06T10:00:00.000Z")
+	ts2, _ := time.Parse(time.RFC3339, "2025-07-06T10:00:05.000Z")
+	ts3, _ := time.Parse(time.RFC3339, "2025-07-06T10:01:00.000Z")
+
+	messages := []domain.Message{
+		{Type: "user", Timestamp: ts1},
+		{Type: "assistant", Timestamp: ts2},
+		{Type: "assistant", Timestamp: ts3},
+	}
+
+	subagents := []domain.SubagentInfo{
+		{AgentID: "a1", Timestamp: ts2.Add(3 * time.Millisecond)},
+		{AgentID: "a2", Timestamp: ts3.Add(2 * time.Millisecond)},
+	}
+
+	result := assignSubagentsToMessages(messages, subagents)
+
+	// a1 should match to message index 1 (assistant at ts2)
+	testutil.Diff(t, 1, len(result[1]))
+	testutil.Diff(t, "a1", result[1][0].AgentID)
+
+	// a2 should match to message index 2 (assistant at ts3)
+	testutil.Diff(t, 1, len(result[2]))
+	testutil.Diff(t, "a2", result[2][0].AgentID)
+
+	// No subagents on user message
+	testutil.Diff(t, 0, len(result[0]))
+}

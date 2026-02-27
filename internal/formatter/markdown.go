@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/annenpolka/cclog/internal/domain"
 )
@@ -13,6 +14,7 @@ import (
 type FormatOptions struct {
 	ShowUUID         bool
 	ShowPlaceholders bool
+	Subagents        []domain.SubagentInfo
 }
 
 // resolveOptions applies defaults when options are omitted
@@ -47,13 +49,31 @@ func FormatConversationToMarkdown(log *domain.ConversationLog, options ...Format
 	// Sort messages by timestamp for chronological order
 	messages := sortedMessages(log.Messages)
 
+	// Build a map of subagent links keyed by the index of the assistant message
+	// they should appear after. We match each subagent to the closest assistant
+	// message by timestamp (the subagent is spawned just after the assistant speaks).
+	subagentsByMsg := assignSubagentsToMessages(messages, opt.Subagents)
+
 	// Process messages
-	for _, msg := range messages {
+	for i, msg := range messages {
 		if msg.Type == "summary" {
 			continue // Skip summary messages for now
 		}
 
 		sb.WriteString(formatMessage(msg, opt))
+
+		// Insert subagent links after the matched assistant message
+		if links, ok := subagentsByMsg[i]; ok {
+			for _, sa := range links {
+				title := sa.Title
+				if title == "" {
+					title = sa.AgentID
+				}
+				sb.WriteString(fmt.Sprintf("- Subagent: [%s](%s)\n", title, sa.FilePath))
+			}
+			sb.WriteString("\n")
+		}
+
 		sb.WriteString("\n")
 	}
 
@@ -144,6 +164,40 @@ func formatMessage(msg domain.Message, options ...FormatOptions) string {
 	}
 
 	return sb.String()
+}
+
+// assignSubagentsToMessages matches each subagent to the closest preceding
+// assistant message by timestamp. Returns a map of message index -> subagent infos.
+func assignSubagentsToMessages(messages []domain.Message, subagents []domain.SubagentInfo) map[int][]domain.SubagentInfo {
+	if len(subagents) == 0 {
+		return nil
+	}
+
+	result := make(map[int][]domain.SubagentInfo)
+
+	for _, sa := range subagents {
+		// Find the closest assistant message at or before the subagent timestamp
+		bestIdx := -1
+		var bestDiff time.Duration
+		for i, msg := range messages {
+			if msg.Type != "assistant" {
+				continue
+			}
+			diff := sa.Timestamp.Sub(msg.Timestamp)
+			if diff < 0 {
+				continue // subagent started before this message
+			}
+			if bestIdx == -1 || diff < bestDiff {
+				bestDiff = diff
+				bestIdx = i
+			}
+		}
+		if bestIdx >= 0 {
+			result[bestIdx] = append(result[bestIdx], sa)
+		}
+	}
+
+	return result
 }
 
 // ExtractMessageContent extracts readable content from the message field with optional informative placeholders

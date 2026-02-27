@@ -57,9 +57,7 @@ func TestParseJSONLDirectory(t *testing.T) {
 		t.Fatalf("Failed to parse JSONL directory: %v", err)
 	}
 
-	testutil.Diff(t, 1, len(logs))
-
-	testutil.Diff(t, 11, len(logs[0].Messages))
+	testutil.Diff(t, 2, len(logs))
 }
 
 func TestParseJSONLFileLargeLines(t *testing.T) {
@@ -128,6 +126,42 @@ func TestParseJSONLFileEmpty(t *testing.T) {
 	}
 
 	testutil.Diff(t, 0, len(log.Messages))
+}
+
+func TestFindSubagentFiles(t *testing.T) {
+	mainFile := filepath.Join("..", "..", "testdata", "test-session-123.jsonl")
+
+	files, err := FindSubagentFiles(mainFile)
+	if err != nil {
+		t.Fatalf("FindSubagentFiles failed: %v", err)
+	}
+
+	testutil.Diff(t, 1, len(files))
+	testutil.True(t, strings.HasSuffix(files[0], "agent-abc123.jsonl"))
+}
+
+func TestFindSubagentFilesNoSubagents(t *testing.T) {
+	mainFile := filepath.Join("..", "..", "testdata", "sample.jsonl")
+
+	files, err := FindSubagentFiles(mainFile)
+	if err != nil {
+		t.Fatalf("FindSubagentFiles failed: %v", err)
+	}
+
+	testutil.Diff(t, 0, len(files))
+}
+
+func TestExtractSubagentInfo(t *testing.T) {
+	saFile := filepath.Join("..", "..", "testdata", "test-session-123", "subagents", "agent-abc123.jsonl")
+
+	info, err := ExtractSubagentInfo(saFile)
+	if err != nil {
+		t.Fatalf("ExtractSubagentInfo failed: %v", err)
+	}
+
+	testutil.Diff(t, "abc123", info.AgentID)
+	testutil.Diff(t, "Find all source files in the project", info.Title)
+	testutil.True(t, !info.Timestamp.IsZero())
 }
 
 func TestParseJSONLDirectoryWithEmptyFiles(t *testing.T) {

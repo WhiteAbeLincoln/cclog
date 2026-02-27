@@ -12,6 +12,7 @@ type Message struct {
 	CWD           string      `json:"cwd"`
 	SessionID     string      `json:"sessionId"`
 	Version       string      `json:"version"`
+	AgentID       string      `json:"agentId,omitempty"`
 	Type          string      `json:"type"`
 	Message       interface{} `json:"message"`
 	IsMeta        bool        `json:"isMeta,omitempty"`
@@ -19,6 +20,14 @@ type Message struct {
 	Timestamp     time.Time   `json:"timestamp"`
 	RequestID     string      `json:"requestId,omitempty"`
 	ToolUseResult interface{} `json:"toolUseResult,omitempty"`
+}
+
+// SubagentInfo holds metadata about a subagent conversation file
+type SubagentInfo struct {
+	FilePath  string
+	AgentID   string
+	Title     string
+	Timestamp time.Time // first message timestamp, for matching to parent
 }
 
 // ConversationLog represents a collection of messages from a JSONL file
