@@ -233,6 +233,113 @@ func TestExtractMessageContent(t *testing.T) {
 			message:  nil,
 			expected: "",
 		},
+		{
+			name: "tool_result with string content",
+			message: map[string]interface{}{
+				"role": "user",
+				"content": []interface{}{
+					map[string]interface{}{
+						"type":        "tool_result",
+						"tool_use_id": "toolu_abc123",
+						"content":     "File created successfully at: /tmp/test.go",
+					},
+				},
+			},
+			expected: "File created successfully at: /tmp/test.go",
+		},
+		{
+			name: "tool_result with array content",
+			message: map[string]interface{}{
+				"role": "user",
+				"content": []interface{}{
+					map[string]interface{}{
+						"type":        "tool_result",
+						"tool_use_id": "toolu_abc123",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type": "text",
+								"text": "Repository exploration complete.",
+							},
+						},
+					},
+				},
+			},
+			expected: "Repository exploration complete.",
+		},
+		{
+			name: "tool_result with empty content",
+			message: map[string]interface{}{
+				"role": "user",
+				"content": []interface{}{
+					map[string]interface{}{
+						"type":        "tool_result",
+						"tool_use_id": "toolu_abc123",
+						"content":     "",
+					},
+				},
+			},
+			expected: "",
+		},
+		{
+			name: "multiple tool_results with string content",
+			message: map[string]interface{}{
+				"role": "user",
+				"content": []interface{}{
+					map[string]interface{}{
+						"type":        "tool_result",
+						"tool_use_id": "toolu_1",
+						"content":     "First result",
+					},
+					map[string]interface{}{
+						"type":        "tool_result",
+						"tool_use_id": "toolu_2",
+						"content":     "Second result",
+					},
+				},
+			},
+			expected: "First result\nSecond result",
+		},
+		{
+			name: "tool_result with array content containing multiple text items",
+			message: map[string]interface{}{
+				"role": "user",
+				"content": []interface{}{
+					map[string]interface{}{
+						"type":        "tool_result",
+						"tool_use_id": "toolu_abc123",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type": "text",
+								"text": "Line one.",
+							},
+							map[string]interface{}{
+								"type": "text",
+								"text": "Line two.",
+							},
+						},
+					},
+				},
+			},
+			expected: "Line one.\nLine two.",
+		},
+		{
+			name: "mixed text and tool_result content",
+			message: map[string]interface{}{
+				"role": "assistant",
+				"content": []interface{}{
+					map[string]interface{}{
+						"type": "text",
+						"text": "Here are the results:",
+					},
+					map[string]interface{}{
+						"type":        "tool_result",
+						"tool_use_id": "toolu_abc123",
+						"content":     "Operation succeeded.",
+					},
+				},
+			},
+			expected: "Here are the results:\nOperation succeeded.",
+		},
 	}
 
 	for _, tt := range tests {
@@ -331,6 +438,58 @@ func TestExtractMessageContentWithPlaceholders(t *testing.T) {
 			expectedWithout:  "This is a normal user message",
 			expectedWith:     "This is a normal user message",
 		},
+		{
+			name: "tool_result with string content shows content not placeholder",
+			message: map[string]interface{}{
+				"role": "user",
+				"content": []interface{}{
+					map[string]interface{}{
+						"type":        "tool_result",
+						"tool_use_id": "toolu_abc",
+						"content":     "Entered plan mode.",
+					},
+				},
+			},
+			showPlaceholders: true,
+			expectedWithout:  "Entered plan mode.",
+			expectedWith:     "Entered plan mode.",
+		},
+		{
+			name: "tool_result with array content shows content not placeholder",
+			message: map[string]interface{}{
+				"role": "user",
+				"content": []interface{}{
+					map[string]interface{}{
+						"type":        "tool_result",
+						"tool_use_id": "toolu_abc",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type": "text",
+								"text": "Exploration report here.",
+							},
+						},
+					},
+				},
+			},
+			showPlaceholders: true,
+			expectedWithout:  "Exploration report here.",
+			expectedWith:     "Exploration report here.",
+		},
+		{
+			name: "tool_result with no content still shows placeholder",
+			message: map[string]interface{}{
+				"role": "user",
+				"content": []interface{}{
+					map[string]interface{}{
+						"type":        "tool_result",
+						"tool_use_id": "toolu_abc",
+					},
+				},
+			},
+			showPlaceholders: true,
+			expectedWithout:  "",
+			expectedWith:     "*[Tool operation completed (no output)]*",
+		},
 	}
 
 	for _, tt := range tests {
@@ -424,6 +583,522 @@ func TestFormatConversationWithSubagentLinks(t *testing.T) {
 
 	testutil.True(t, exploreIdx < linkIdx)
 	testutil.True(t, linkIdx < writingIdx)
+}
+
+func TestIsToolResultOnly(t *testing.T) {
+	tests := []struct {
+		name     string
+		msg      domain.Message
+		expected bool
+	}{
+		{
+			name: "tool_result only message",
+			msg: domain.Message{
+				Type: "user",
+				Message: map[string]interface{}{
+					"role": "user",
+					"content": []interface{}{
+						map[string]interface{}{
+							"type":        "tool_result",
+							"tool_use_id": "toolu_1",
+							"content":     "result text",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "multiple tool_results",
+			msg: domain.Message{
+				Type: "user",
+				Message: map[string]interface{}{
+					"role": "user",
+					"content": []interface{}{
+						map[string]interface{}{
+							"type":        "tool_result",
+							"tool_use_id": "toolu_1",
+							"content":     "first",
+						},
+						map[string]interface{}{
+							"type":        "tool_result",
+							"tool_use_id": "toolu_2",
+							"content":     "second",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "mixed text and tool_result",
+			msg: domain.Message{
+				Type: "user",
+				Message: map[string]interface{}{
+					"role": "user",
+					"content": []interface{}{
+						map[string]interface{}{
+							"type": "text",
+							"text": "some user text",
+						},
+						map[string]interface{}{
+							"type":        "tool_result",
+							"tool_use_id": "toolu_1",
+							"content":     "result",
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "plain user message",
+			msg: domain.Message{
+				Type: "user",
+				Message: map[string]interface{}{
+					"role":    "user",
+					"content": "Hello",
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "empty content array",
+			msg: domain.Message{
+				Type: "user",
+				Message: map[string]interface{}{
+					"role":    "user",
+					"content": []interface{}{},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testutil.Diff(t, tt.expected, isToolResultOnly(tt.msg))
+		})
+	}
+}
+
+func TestMessageHasToolUse(t *testing.T) {
+	tests := []struct {
+		name     string
+		msg      domain.Message
+		expected bool
+	}{
+		{
+			name: "assistant with tool_use",
+			msg: domain.Message{
+				Type: "assistant",
+				Message: map[string]interface{}{
+					"role": "assistant",
+					"content": []interface{}{
+						map[string]interface{}{
+							"type": "tool_use",
+							"name": "Bash",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "assistant with text and tool_use",
+			msg: domain.Message{
+				Type: "assistant",
+				Message: map[string]interface{}{
+					"role": "assistant",
+					"content": []interface{}{
+						map[string]interface{}{
+							"type": "text",
+							"text": "Let me check.",
+						},
+						map[string]interface{}{
+							"type": "tool_use",
+							"name": "Read",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "assistant with text only",
+			msg: domain.Message{
+				Type: "assistant",
+				Message: map[string]interface{}{
+					"role":    "assistant",
+					"content": "Just text.",
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testutil.Diff(t, tt.expected, messageHasToolUse(tt.msg))
+		})
+	}
+}
+
+func TestToolResultMergedWithToolUse(t *testing.T) {
+	originalLocal := time.Local
+	time.Local = time.UTC
+	t.Cleanup(func() { time.Local = originalLocal })
+
+	ts1, _ := time.Parse(time.RFC3339, "2025-07-06T10:00:00.000Z")
+	ts2, _ := time.Parse(time.RFC3339, "2025-07-06T10:00:01.000Z")
+	ts3, _ := time.Parse(time.RFC3339, "2025-07-06T10:00:02.000Z")
+
+	t.Run("tool_result merged under assistant with placeholders", func(t *testing.T) {
+		log := &domain.ConversationLog{
+			FilePath: "/test/conv.jsonl",
+			Messages: []domain.Message{
+				{
+					Type:      "assistant",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "assistant",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type": "tool_use",
+								"name": "EnterPlanMode",
+							},
+						},
+					},
+				},
+				{
+					Type:      "user",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "user",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type":        "tool_result",
+								"tool_use_id": "toolu_1",
+								"content":     "Entered plan mode.",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		markdown := FormatConversationToMarkdown(log, FormatOptions{ShowPlaceholders: true})
+
+		// Tool result should appear under Assistant, not under User
+		testutil.True(t, strings.Contains(markdown, "## Assistant"))
+		testutil.True(t, !strings.Contains(markdown, "## User"))
+
+		// Should show tool name without "(no output)" since there IS output
+		testutil.True(t, strings.Contains(markdown, "*[Tool used: EnterPlanMode]*"))
+		testutil.True(t, !strings.Contains(markdown, "(no output)"))
+
+		// Tool result content should appear
+		testutil.True(t, strings.Contains(markdown, "Entered plan mode."))
+	})
+
+	t.Run("tool_result with empty content keeps no output", func(t *testing.T) {
+		log := &domain.ConversationLog{
+			FilePath: "/test/conv.jsonl",
+			Messages: []domain.Message{
+				{
+					Type:      "assistant",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "assistant",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type": "tool_use",
+								"name": "Task",
+							},
+						},
+					},
+				},
+				{
+					Type:      "user",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "user",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type":        "tool_result",
+								"tool_use_id": "toolu_1",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		markdown := FormatConversationToMarkdown(log, FormatOptions{ShowPlaceholders: true})
+
+		testutil.True(t, !strings.Contains(markdown, "## User"))
+		// Empty tool result keeps "(no output)"
+		testutil.True(t, strings.Contains(markdown, "*[Tool used: Task (no output)]*"))
+	})
+
+	t.Run("tool_result with array content merged", func(t *testing.T) {
+		log := &domain.ConversationLog{
+			FilePath: "/test/conv.jsonl",
+			Messages: []domain.Message{
+				{
+					Type:      "assistant",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "assistant",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type": "tool_use",
+								"name": "Task",
+							},
+						},
+					},
+				},
+				{
+					Type:      "user",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "user",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type":        "tool_result",
+								"tool_use_id": "toolu_1",
+								"content": []interface{}{
+									map[string]interface{}{
+										"type": "text",
+										"text": "Exploration complete.",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		markdown := FormatConversationToMarkdown(log, FormatOptions{ShowPlaceholders: true})
+
+		testutil.True(t, !strings.Contains(markdown, "## User"))
+		testutil.True(t, strings.Contains(markdown, "Exploration complete."))
+	})
+
+	t.Run("consecutive tool_use/result pairs", func(t *testing.T) {
+		log := &domain.ConversationLog{
+			FilePath: "/test/conv.jsonl",
+			Messages: []domain.Message{
+				{
+					Type:      "assistant",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "assistant",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type": "tool_use",
+								"name": "Read",
+							},
+						},
+					},
+				},
+				{
+					Type:      "user",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "user",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type":        "tool_result",
+								"tool_use_id": "toolu_1",
+								"content":     "file contents here",
+							},
+						},
+					},
+				},
+				{
+					Type:      "assistant",
+					Timestamp: ts2,
+					Message: map[string]interface{}{
+						"role": "assistant",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type": "tool_use",
+								"name": "Write",
+							},
+						},
+					},
+				},
+				{
+					Type:      "user",
+					Timestamp: ts2,
+					Message: map[string]interface{}{
+						"role": "user",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type":        "tool_result",
+								"tool_use_id": "toolu_2",
+								"content":     "File written.",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		markdown := FormatConversationToMarkdown(log, FormatOptions{ShowPlaceholders: true})
+
+		testutil.True(t, !strings.Contains(markdown, "## User"))
+		testutil.True(t, strings.Contains(markdown, "file contents here"))
+		testutil.True(t, strings.Contains(markdown, "File written."))
+
+		// Both should be under Assistant headers
+		assistantCount := strings.Count(markdown, "## Assistant")
+		testutil.Diff(t, 2, assistantCount)
+	})
+
+	t.Run("text and tool_use in assistant with tool_result following", func(t *testing.T) {
+		log := &domain.ConversationLog{
+			FilePath: "/test/conv.jsonl",
+			Messages: []domain.Message{
+				{
+					Type:      "assistant",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "assistant",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type": "text",
+								"text": "Let me check the file.",
+							},
+							map[string]interface{}{
+								"type": "tool_use",
+								"name": "Read",
+							},
+						},
+					},
+				},
+				{
+					Type:      "user",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "user",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type":        "tool_result",
+								"tool_use_id": "toolu_1",
+								"content":     "package main\nfunc main() {}",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		markdown := FormatConversationToMarkdown(log)
+
+		testutil.True(t, !strings.Contains(markdown, "## User"))
+		testutil.True(t, strings.Contains(markdown, "Let me check the file."))
+		testutil.True(t, strings.Contains(markdown, "package main"))
+	})
+
+	t.Run("real user message after tool_result not skipped", func(t *testing.T) {
+		log := &domain.ConversationLog{
+			FilePath: "/test/conv.jsonl",
+			Messages: []domain.Message{
+				{
+					Type:      "assistant",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "assistant",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type": "tool_use",
+								"name": "Bash",
+							},
+						},
+					},
+				},
+				{
+					Type:      "user",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "user",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type":        "tool_result",
+								"tool_use_id": "toolu_1",
+								"content":     "done",
+							},
+						},
+					},
+				},
+				{
+					Type:      "user",
+					Timestamp: ts3,
+					Message: map[string]interface{}{
+						"role":    "user",
+						"content": "That looks good, continue.",
+					},
+				},
+			},
+		}
+
+		markdown := FormatConversationToMarkdown(log)
+
+		// Real user message should still have its own header
+		testutil.True(t, strings.Contains(markdown, "## User"))
+		testutil.True(t, strings.Contains(markdown, "That looks good, continue."))
+	})
+}
+
+func TestToolResultMergedInMultipleConversations(t *testing.T) {
+	originalLocal := time.Local
+	time.Local = time.UTC
+	t.Cleanup(func() { time.Local = originalLocal })
+
+	ts1, _ := time.Parse(time.RFC3339, "2025-07-06T10:00:00.000Z")
+
+	logs := []*domain.ConversationLog{
+		{
+			FilePath: "/test/conv.jsonl",
+			Messages: []domain.Message{
+				{
+					Type:      "assistant",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "assistant",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type": "tool_use",
+								"name": "Bash",
+							},
+						},
+					},
+				},
+				{
+					Type:      "user",
+					Timestamp: ts1,
+					Message: map[string]interface{}{
+						"role": "user",
+						"content": []interface{}{
+							map[string]interface{}{
+								"type":        "tool_result",
+								"tool_use_id": "toolu_1",
+								"content":     "command output here",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	markdown := FormatMultipleConversationsToMarkdown(logs, FormatOptions{ShowPlaceholders: true})
+
+	testutil.True(t, !strings.Contains(markdown, "## User"))
+	testutil.True(t, strings.Contains(markdown, "command output here"))
 }
 
 func TestAssignSubagentsToMessages(t *testing.T) {

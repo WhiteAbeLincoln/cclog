@@ -60,7 +60,20 @@ func FormatConversationToMarkdown(log *domain.ConversationLog, options ...Format
 			continue // Skip summary messages for now
 		}
 
-		sb.WriteString(formatMessage(msg, opt))
+		// Skip tool-result-only user messages; they get merged with the preceding tool_use
+		if isToolResultOnly(msg) {
+			continue
+		}
+
+		formatted := formatMessage(msg, opt)
+
+		// If this assistant message has tool_use, merge the following tool_result content
+		if messageHasToolUse(msg) && i+1 < len(messages) && isToolResultOnly(messages[i+1]) {
+			resultText := ExtractMessageContent(messages[i+1].Message)
+			formatted = mergeToolResult(formatted, resultText, opt.ShowPlaceholders)
+		}
+
+		sb.WriteString(formatted)
 
 		// Insert subagent links after the matched assistant message
 		if links, ok := subagentsByMsg[i]; ok {
@@ -105,11 +118,22 @@ func FormatMultipleConversationsToMarkdown(logs []*domain.ConversationLog, optio
 		// Sort messages by timestamp
 		messages := sortedMessages(log.Messages)
 
-		for _, msg := range messages {
+		for i, msg := range messages {
 			if msg.Type == "summary" {
 				continue
 			}
-			sb.WriteString(formatMessage(msg, opt))
+			if isToolResultOnly(msg) {
+				continue
+			}
+
+			formatted := formatMessage(msg, opt)
+
+			if messageHasToolUse(msg) && i+1 < len(messages) && isToolResultOnly(messages[i+1]) {
+				resultText := ExtractMessageContent(messages[i+1].Message)
+				formatted = mergeToolResult(formatted, resultText, opt.ShowPlaceholders)
+			}
+
+			sb.WriteString(formatted)
 			sb.WriteString("\n")
 		}
 
@@ -200,6 +224,71 @@ func assignSubagentsToMessages(messages []domain.Message, subagents []domain.Sub
 	return result
 }
 
+// isToolResultOnly returns true if the message content array contains exclusively tool_result items.
+func isToolResultOnly(msg domain.Message) bool {
+	msgMap, ok := msg.Message.(map[string]interface{})
+	if !ok {
+		return false
+	}
+	content, exists := msgMap["content"]
+	if !exists {
+		return false
+	}
+	contentArray, ok := content.([]interface{})
+	if !ok || len(contentArray) == 0 {
+		return false
+	}
+	for _, item := range contentArray {
+		itemMap, ok := item.(map[string]interface{})
+		if !ok {
+			return false
+		}
+		if itemMap["type"] != "tool_result" {
+			return false
+		}
+	}
+	return true
+}
+
+// messageHasToolUse returns true if the message content array contains any tool_use item.
+func messageHasToolUse(msg domain.Message) bool {
+	msgMap, ok := msg.Message.(map[string]interface{})
+	if !ok {
+		return false
+	}
+	content, exists := msgMap["content"]
+	if !exists {
+		return false
+	}
+	contentArray, ok := content.([]interface{})
+	if !ok {
+		return false
+	}
+	for _, item := range contentArray {
+		itemMap, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if itemMap["type"] == "tool_use" {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeToolResult takes a formatted assistant message and appends tool result content.
+// When placeholders are enabled, it also removes "(no output)" from the tool_use line.
+func mergeToolResult(formatted string, resultText string, showPlaceholders bool) string {
+	if resultText == "" {
+		return formatted
+	}
+	if showPlaceholders {
+		formatted = strings.ReplaceAll(formatted, " (no output)]*", "]*")
+	}
+	formatted = strings.TrimRight(formatted, "\n") + "\n\n" + resultText + "\n\n"
+	return formatted
+}
+
 // ExtractMessageContent extracts readable content from the message field with optional informative placeholders
 func ExtractMessageContent(message interface{}, showPlaceholders ...bool) string {
 	showPlaceholdersBool := false
@@ -260,6 +349,22 @@ func ExtractMessageContent(message interface{}, showPlaceholders ...bool) string
 						if toolUseID, exists := itemMap["tool_use_id"]; exists {
 							if toolID, ok := toolUseID.(string); ok {
 								toolOperations = append(toolOperations, toolID)
+							}
+						}
+						// Extract tool result content
+						if trContent, exists := itemMap["content"]; exists {
+							if trStr, ok := trContent.(string); ok && trStr != "" {
+								parts = append(parts, trStr)
+							} else if trArray, ok := trContent.([]interface{}); ok {
+								for _, trItem := range trArray {
+									if trItemMap, ok := trItem.(map[string]interface{}); ok {
+										if trItemMap["type"] == "text" {
+											if trText, ok := trItemMap["text"].(string); ok && trText != "" {
+												parts = append(parts, trText)
+											}
+										}
+									}
+								}
 							}
 						}
 					}
